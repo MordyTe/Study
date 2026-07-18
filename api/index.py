@@ -77,6 +77,7 @@ async def health():
         "boot_error": _boot_error,
         "python": sys.version.split()[0],
         "region": os.environ.get("VERCEL_REGION", "unknown"),
+        "commit": os.environ.get("VERCEL_GIT_COMMIT_SHA", "unknown")[:9],
         "config_loads": config_ok,
         "config_error": config_err,
         "static_dir_exists": STATIC_DIR.exists(),
