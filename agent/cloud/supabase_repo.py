@@ -24,16 +24,15 @@ class SupabaseRepo:
     def __init__(self, url: str | None = None, service_key: str | None = None) -> None:
         self.url = (url or os.environ["SUPABASE_URL"]).rstrip("/")
         key = (service_key or os.environ["SUPABASE_SERVICE_KEY"]).strip()
+        # Both legacy JWT keys and new-format sb_secret_ keys ride in both
+        # headers — verified against the live gateway (apikey+Bearer accepted
+        # for new-format keys; secret keys require the Authorization header).
         headers = {
             "apikey": key,
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
             "Prefer": "return=minimal",
         }
-        # Legacy service_role keys are JWTs and may ride in Authorization;
-        # new-format keys (sb_secret_...) must NOT be sent as Bearer — the
-        # gateway rejects non-JWT bearer tokens with 401.
-        if key.startswith("eyJ"):
-            headers["Authorization"] = f"Bearer {key}"
         self._client = httpx.AsyncClient(
             base_url=f"{self.url}/rest/v1",
             headers=headers,
