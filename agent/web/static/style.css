@@ -43,4 +43,11 @@ tr.long td:first-child { border-left: 3px solid var(--green); }
 tr.short td:first-child { border-left: 3px solid var(--red); }
 .state-win { color: var(--green); } .state-loss { color: var(--red); }
 .state-active, .state-delivered { color: var(--accent); }
+.analysis { white-space: pre-wrap; line-height: 1.6; font-size: 13.5px; }
+.analysis-ts { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.mini-btn {
+  background: #1f6feb; color: #fff; border: 0; border-radius: 6px;
+  padding: 3px 10px; cursor: pointer; font-size: 12px; margin-left: 10px; vertical-align: middle;
+}
+.mini-btn:disabled { opacity: .5; }
 @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }

@@ -25,45 +25,19 @@
 4. **Deploy**. בסיום תקבל כתובת: `https://<project>.vercel.app`.
 5. בדיקה: פתח `https://<project>.vercel.app` — הדשבורד אמור לעלות עם גרף חי (מ-Bybit REST). ה-badge יציג `cloud · polling`.
 
-## ✅ צ'קליסט הפעלה (אחרי שהאתר עולה)
+## ✅ הפעלה — הכל מהאתר, 3 כפתורים
 
-סדר הפעולות הנכון, הכל מהנייד:
+אחרי שהאתר עולה (`/api/health` מראה `boot_ok:true`), הכל קורה ב-**Backoffice** של האתר עצמו — `https://<project>.vercel.app/settings`:
 
-1. **`/api/health`** — ודא: `boot_ok:true`, `region` שמתחיל ב-`fra`, `bybit.ok:true`, `supabase.ok:true`.
-   אם `bybit.ok:false` ו-region אמריקאי → Vercel → Settings → Functions → Function Region → **Frankfurt** → Redeploy.
-2. **Backoffice** (`/settings`) → הדבק את ה-`CRON_SECRET` בשדה ולחץ Save (נשמר רק בדפדפן שלך).
-3. לחץ **🔗 Connect Telegram webhook** — מחבר את הבוט אוטומטית (בלי curl).
-4. לחץ **▶️ Run tick now** — ה-tick הראשון ירוץ, ותקבל בטלגרם הודעת "🚀 Agent online".
-5. הגדר את ה-**cron הדקתי** (סעיף למטה) — ומעכשיו המערכת חיה לבד.
+1. הדבק את ה-`CRON_SECRET` בשדה שבקטע **Engine Controls** → **Save** (נשמר רק בדפדפן שלך)
+2. לחץ **🔗 Connect Telegram webhook** — מחבר את הבוט (בלי curl)
+3. לחץ **🕐 Enable 24/7 auto-run** — מפעיל את המנוע לתמיד
 
-## שלב 2 — ה-tick הדקתי (Hobby plan)
+זהו. ה-scheduler המובנה של Supabase (pg_cron) קורא ל-`/api/tick` כל דקה, 24/7, בלי שום שירות חיצוני ובלי דפדפן פתוח. תוך דקה-שתיים תקבל בטלגרם "🚀 Agent online" והדשבורד יתמלא.
 
-Vercel Hobby מגביל cron מובנה לפעם ביום, אז נשתמש בפינגר חיצוני חינמי:
+כפתורים נוספים: **▶️ Run tick now** (הרצה ידנית מיידית), **⏸ Disable** (השבתת ה-24/7), ובדשבורד — **🔍 Analyze now** (דוח Gemini על מצב השוק, מוצג באתר).
 
-1. הירשם ל-[cron-job.org](https://cron-job.org) (חינם).
-2. צור Job חדש:
-   - **URL**: `https://<project>.vercel.app/api/tick?secret=<CRON_SECRET>`
-   - **Schedule**: every 1 minute
-   - **Timeout**: 60 seconds
-3. שמור. בתוך דקה-שתיים תראה בלוגים של Vercel קריאות tick, וב-`/api/state` יופיע `feed_ok: true`.
-
-בדיקה ידנית: `curl "https://<project>.vercel.app/api/tick?secret=<CRON_SECRET>"` — אמור להחזיר JSON עם `"ok": true`.
-
-> 💡 אם תשדרג ל-Vercel Pro: מחק את הפינגר, והוסף ל-`vercel.json`:
-> ```json
-> "crons": [{ "path": "/api/tick", "schedule": "* * * * *" }]
-> ```
-> (Vercel שולח אוטומטית `Authorization: Bearer <CRON_SECRET>`.)
-
-## שלב 3 — חיבור הטלגרם (webhook)
-
-הרץ פעם אחת (החלף את הערכים):
-
-```bash
-curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://<project>.vercel.app/api/telegram&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
-```
-
-עכשיו שלח `/status` לבוט — אמורה לחזור תשובה עם מצב השוק.
+בדיקת תקינות בכל רגע: `/api/health` — מציג region, חיבור Bybit, חיבור Supabase, סטטוס ה-cron וטריות ה-tick האחרון.
 
 ## שלב 4 — Backoffice בענן
 

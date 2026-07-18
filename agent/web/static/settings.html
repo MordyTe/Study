@@ -53,9 +53,12 @@
       <button class="save" id="ops-secret-save">Save</button>
     </div>
     <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+      <button class="save" id="btn-cron">🕐 Enable 24/7 auto-run</button>
+      <button class="save" id="btn-cron-off" style="background:#6e2c2c">⏸ Disable</button>
       <button class="save" id="btn-tick">▶️ Run tick now</button>
       <button class="save" id="btn-webhook">🔗 Connect Telegram webhook</button>
     </div>
+    <div class="note" id="cron-status" style="margin-top:8px"></div>
     <pre id="ops-result" style="margin-top:12px; font-size:12px; white-space:pre-wrap; color:var(--muted)"></pre>
   </div>
 
@@ -190,7 +193,8 @@ function setupOps() {
     if (!secret) { flash('קודם הדבק ושמור את ה-CRON_SECRET למעלה', false); return; }
     btn.disabled = true; result.textContent = `${label}…`;
     try {
-      const res = await fetch(`${path}?secret=${encodeURIComponent(secret)}`);
+      const sep = path.includes('?') ? '&' : '?';
+      const res = await fetch(`${path}${sep}secret=${encodeURIComponent(secret)}`);
       const body = await res.json();
       result.textContent = JSON.stringify(body, null, 2);
       flash(res.ok && (body.ok !== false) ? `${label}: הצליח ✓` : `${label}: נכשל — ראה פירוט למטה`, res.ok && (body.ok !== false));
@@ -202,7 +206,26 @@ function setupOps() {
     ev => call('/api/tick', ev.target, 'Tick'));
   document.getElementById('btn-webhook').addEventListener('click',
     ev => call('/api/setup-telegram', ev.target, 'Telegram webhook'));
+  document.getElementById('btn-cron').addEventListener('click',
+    ev => call('/api/setup-cron', ev.target, '24/7 auto-run').then(showCronStatus));
+  document.getElementById('btn-cron-off').addEventListener('click',
+    ev => call('/api/setup-cron?disable=1', ev.target, 'Disable auto-run').then(showCronStatus));
+  showCronStatus();
   return panel;
+}
+
+async function showCronStatus() {
+  try {
+    const h = await (await fetch('/api/health')).json();
+    const el = document.getElementById('cron-status');
+    const c = h.cron || {};
+    if (c.scheduled) {
+      el.innerHTML = `🟢 24/7 auto-run <b>פעיל</b> — רץ כל דקה` +
+        (c.last_run_at ? ` · ריצה אחרונה: ${new Date(c.last_run_at).toLocaleTimeString()}` : '');
+    } else {
+      el.innerHTML = `🔴 24/7 auto-run <b>כבוי</b> — לחץ "Enable 24/7 auto-run" כדי שהמערכת תרוץ לבד`;
+    }
+  } catch (e) { /* ignore */ }
 }
 
 async function detectCloud() {

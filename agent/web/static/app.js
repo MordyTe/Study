@@ -92,20 +92,28 @@
   const kv = (k, v, cls = '') => `<div><span class="k">${k}</span><span class="${cls}">${v}</span></div>`;
 
   let candlesOk = true;
+  function showAnalysis(a) {
+    if (!a || !a.text) return;
+    document.getElementById('analysis-body').textContent = a.text;
+    document.getElementById('analysis-ts').textContent =
+      'עודכן: ' + new Date(a.ts).toLocaleString();
+  }
+
   async function loadState() {
     try {
       const s = await (await fetch('/api/state')).json();
       // engine-not-started banner (only when the chart itself is fine)
       if (candlesOk) {
         if (!s.last_tick_ms) {
-          banner(`⏳ המנוע עוד לא הופעל אף פעם — היכנס ל-<a href="/settings">Backoffice</a> ולחץ "Run tick now", ואז הגדר cron דקתי (ראה DEPLOY.md).`);
+          banner(`⏳ המנוע עוד לא הופעל — היכנס ל-<a href="/settings">Backoffice</a> ולחץ 🕐 Enable 24/7 auto-run. זהו, זה הכל.`);
         } else if (!s.feed_ok) {
           const mins = Math.round((Date.now() - s.last_tick_ms) / 60000);
-          banner(`⚠️ ה-tick האחרון רץ לפני ${mins} דקות — ה-cron הדקתי לא פעיל. בדוק את cron-job.org.`);
+          banner(`⚠️ ה-tick האחרון רץ לפני ${mins} דקות — בדוק ב-<a href="/settings">Backoffice</a> שה-24/7 auto-run פעיל.`);
         } else {
           banner(null);
         }
       }
+      showAnalysis(s.analysis);
       let html = '';
       html += kv('price', s.price ? s.price.toFixed(2) : '–');
       for (const [tf, b] of Object.entries(s.biases || {}))
@@ -182,6 +190,26 @@
       loadCandles(currentTf).then(loadSignals);
     });
   });
+
+  // Analyze-now button appears when a CRON_SECRET is stored (set in /settings)
+  const analyzeBtn = document.getElementById('btn-analyze');
+  if (localStorage.getItem('cron_secret')) {
+    analyzeBtn.hidden = false;
+    analyzeBtn.addEventListener('click', async () => {
+      analyzeBtn.disabled = true;
+      document.getElementById('analysis-body').textContent = 'מריץ ניתוח Gemini… (10–30 שניות)';
+      try {
+        const secret = encodeURIComponent(localStorage.getItem('cron_secret'));
+        const res = await fetch(`/api/analyze?secret=${secret}`);
+        const body = await res.json();
+        if (body.ok) showAnalysis({ text: body.analysis, ts: body.ts });
+        else document.getElementById('analysis-body').textContent = 'הניתוח נכשל: ' + (body.error || res.status);
+      } catch (e) {
+        document.getElementById('analysis-body').textContent = 'הניתוח נכשל: ' + e.message;
+      }
+      analyzeBtn.disabled = false;
+    });
+  }
 
   loadCandles(currentTf).then(ok => { candlesOk = ok; return loadSignals(); });
   loadState(); loadStats();

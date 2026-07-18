@@ -106,6 +106,10 @@ async def health():
         out["last_tick_ms"] = tick_state.get("last_run_ms")
         out["tick_fresh"] = bool(tick_state.get("last_run_ms")) and \
             now_ms() - int(tick_state.get("last_run_ms", 0)) < 180_000
+        try:
+            out["cron"] = await r.rpc("ta_tick_status")
+        except Exception as e:
+            out["cron"] = {"error": str(e)[:200]}
     except Exception as e:
         out["supabase"] = {"ok": False, "error": str(e)[:300]}
         out["tick_ever_ran"] = None
@@ -152,6 +156,36 @@ else:
         except Exception as e:
             log.exception("tick failed")
             return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+    # --------------------------------- 24/7 scheduler (Supabase pg_cron)
+    @app.get("/api/setup-cron")
+    async def setup_cron(request: Request, authorization: str | None = Header(None)):
+        """Enable/disable the built-in minute scheduler — no external service."""
+        _check_cron_auth(request, authorization)
+        r = repo()
+        if request.query_params.get("disable"):
+            result = await r.rpc("ta_disable_tick")
+            status = await r.rpc("ta_tick_status")
+            return {"ok": True, "result": result, "status": status}
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+        secret = os.environ.get("CRON_SECRET", "")
+        tick_url = f"https://{host}/api/tick?secret={secret}"
+        result = await r.rpc("ta_enable_tick", {"url": tick_url})
+        status = await r.rpc("ta_tick_status")
+        return {"ok": result == "scheduled", "result": result, "status": status,
+                "note": "the engine now runs every minute, 24/7, powered by Supabase pg_cron"}
+
+    # --------------------------------------- on-demand analysis (site-visible)
+    @app.get("/api/analyze")
+    async def analyze(request: Request, authorization: str | None = Header(None)):
+        _check_cron_auth(request, authorization)
+        try:
+            text = await _run_analysis()
+        except Exception as e:
+            log.exception("analyze failed")
+            return JSONResponse({"ok": False, "error": str(e)[:300]}, status_code=500)
+        await repo().set_state("last_analysis", {"text": text, "ts": now_ms()})
+        return {"ok": True, "analysis": text, "ts": now_ms()}
 
     # ------------------------------------------ one-tap telegram webhook setup
     @app.get("/api/setup-telegram")
@@ -292,6 +326,7 @@ else:
         r = repo()
         market = await r.get_state("market", {}) or {}
         tick_state = await r.get_state("tick", {}) or {}
+        analysis = await r.get_state("last_analysis", None)
         return {
             "price": market.get("price"),
             "biases": market.get("biases", {}),
@@ -299,6 +334,7 @@ else:
             "cvd_30m": None,
             "feed_ok": now_ms() - int(tick_state.get("last_run_ms", 0)) < 180_000,
             "last_tick_ms": tick_state.get("last_run_ms"),
+            "analysis": analysis,
         }
 
     # --------------------------------------------------- cloud backoffice

@@ -50,6 +50,15 @@ class SupabaseRepo:
         r.raise_for_status()
         return r.json()
 
+    async def rpc(self, fn: str, args: dict | None = None):
+        """Call a Postgres function via PostgREST RPC (service role only)."""
+        r = await self._client.post(f"/rpc/{fn}", json=args or {})
+        r.raise_for_status()
+        try:
+            return r.json()
+        except ValueError:
+            return r.text
+
     # -- signals -------------------------------------------------------------
     async def save_signal(self, s: Signal) -> None:
         await self._upsert("ta_signals", [{
