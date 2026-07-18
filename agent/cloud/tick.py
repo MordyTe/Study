@@ -205,10 +205,11 @@ async def run_tick(cfg: Config, repo: SupabaseRepo, site_host: str | None = None
     # ---- 4.6 first successful tick — announce the pipeline is alive --------
     if not state.get("first_tick_done"):
         price = store.last_price(market)
+        price_txt = f"ETH: {price:,.2f}" if price is not None else "warming up"
         await telegram.send(
             "🚀 <b>Agent online</b> — first tick completed.\n"
-            f"ETH: {price:,.2f}" + (f" · funding {deriv.funding_rate * 100:.4f}%"
-                                    if deriv.funding_rate is not None else "") +
+            + price_txt + (f" · funding {deriv.funding_rate * 100:.4f}%"
+                           if deriv.funding_rate is not None else "") +
             "\nThe engine now evaluates the market every minute. "
             "Signals will arrive only on real confluence."
         )
