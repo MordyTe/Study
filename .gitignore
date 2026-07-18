@@ -1,11 +1,11 @@
 # Secrets — never commit
 .env
 
-# Databases
+# Databases (root data/ only — a bare "data/" would also ignore agent/data/)
 *.db
 *.db-wal
 *.db-shm
-data/
+/data/
 
 # Python
 __pycache__/
