@@ -164,6 +164,36 @@ async def run_tick(cfg: Config, repo: SupabaseRepo) -> dict:
         log.info("SIGNAL %s %s %s conf=%.2f", sig.id, sig.style.value,
                  sig.direction.value, sig.confidence)
 
+    # ---- 4.5 periodic Gemini regime report ---------------------------------
+    regime_ms = int(state.get("regime_ms", 0))
+    regime_interval = cfg.llm.regime_report_hours * 3_600_000
+    if cfg.llm.enabled and now_ms() - regime_ms >= regime_interval:
+        regime_ms = now_ms()  # advance even on failure — never spam retries
+        try:
+            llm = GeminiAnalyst(cfg, repo=None)
+            if llm.available:
+                sc_i = cfg.styles.get("intraday")
+                if sc_i is not None:
+                    tfs_i = list(dict.fromkeys([sc_i.entry_tf, *sc_i.gate_tfs, "D"]))
+                    ctx_i = builder.build(market, sc_i.entry_tf, tfs_i, now_ms())
+                    if ctx_i is not None:
+                        report = await llm.regime_report(ctx_i)
+                        if report:
+                            await telegram.send(f"<b>🧭 Market Regime Report</b>\n\n{report}")
+        except Exception as e:
+            log.warning("regime report failed: %s", e)
+
+    # ---- 4.6 first successful tick — announce the pipeline is alive --------
+    if not state.get("first_tick_done"):
+        price = store.last_price(market)
+        await telegram.send(
+            "🚀 <b>Agent online</b> — first tick completed.\n"
+            f"ETH: {price:,.2f}" + (f" · funding {deriv.funding_rate * 100:.4f}%"
+                                    if deriv.funding_rate is not None else "") +
+            "\nThe engine now evaluates the market every minute. "
+            "Signals will arrive only on real confluence."
+        )
+
     # ---- 5. persist state + market snapshot for the dashboard --------------
     fire_state = {
         f"{k[0].value}:{k[1].value}": [v[0], v[1]] for k, v in engine._last_fire.items()
@@ -173,6 +203,8 @@ async def run_tick(cfg: Config, repo: SupabaseRepo) -> dict:
         "last_eval": last_eval,
         "last_fire": fire_state,
         "last_run_ms": now_ms(),
+        "regime_ms": regime_ms,
+        "first_tick_done": True,
     })
 
     biases = {}

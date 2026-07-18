@@ -25,6 +25,17 @@
 4. **Deploy**. בסיום תקבל כתובת: `https://<project>.vercel.app`.
 5. בדיקה: פתח `https://<project>.vercel.app` — הדשבורד אמור לעלות עם גרף חי (מ-Bybit REST). ה-badge יציג `cloud · polling`.
 
+## ✅ צ'קליסט הפעלה (אחרי שהאתר עולה)
+
+סדר הפעולות הנכון, הכל מהנייד:
+
+1. **`/api/health`** — ודא: `boot_ok:true`, `region` שמתחיל ב-`fra`, `bybit.ok:true`, `supabase.ok:true`.
+   אם `bybit.ok:false` ו-region אמריקאי → Vercel → Settings → Functions → Function Region → **Frankfurt** → Redeploy.
+2. **Backoffice** (`/settings`) → הדבק את ה-`CRON_SECRET` בשדה ולחץ Save (נשמר רק בדפדפן שלך).
+3. לחץ **🔗 Connect Telegram webhook** — מחבר את הבוט אוטומטית (בלי curl).
+4. לחץ **▶️ Run tick now** — ה-tick הראשון ירוץ, ותקבל בטלגרם הודעת "🚀 Agent online".
+5. הגדר את ה-**cron הדקתי** (סעיף למטה) — ומעכשיו המערכת חיה לבד.
+
 ## שלב 2 — ה-tick הדקתי (Hobby plan)
 
 Vercel Hobby מגביל cron מובנה לפעם ביום, אז נשתמש בפינגר חיצוני חינמי:

@@ -21,6 +21,12 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: v
   padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
 }
 #tf-switch button.active { color: var(--accent); border-color: var(--accent); }
+#banner {
+  margin-bottom: 12px; padding: 10px 14px; border-radius: 8px; font-size: 14px;
+  background: rgba(210,153,34,.15); color: #d29922; border: 1px solid #d29922;
+}
+#banner.error { background: rgba(248,81,73,.12); color: var(--red); border-color: var(--red); }
+#banner a { color: inherit; }
 main { display: grid; grid-template-columns: 1fr 320px; gap: 12px; }
 #chart-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
 #chart { height: 520px; }

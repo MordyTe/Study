@@ -45,6 +45,20 @@
     <div id="flash" class="flash"></div>
   </div>
 
+  <div class="panel" style="margin-top:12px" id="ops-panel" hidden>
+    <h2>Engine Controls (cloud)</h2>
+    <div class="secret-row">
+      <label>CRON_SECRET<br><span class="cur">נשמר רק בדפדפן שלך (localStorage)</span></label>
+      <input type="password" id="ops-secret" placeholder="paste your CRON_SECRET" autocomplete="off">
+      <button class="save" id="ops-secret-save">Save</button>
+    </div>
+    <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+      <button class="save" id="btn-tick">▶️ Run tick now</button>
+      <button class="save" id="btn-webhook">🔗 Connect Telegram webhook</button>
+    </div>
+    <pre id="ops-result" style="margin-top:12px; font-size:12px; white-space:pre-wrap; color:var(--muted)"></pre>
+  </div>
+
   <div class="panel" style="margin-top:12px" id="runtime-panel" hidden>
     <h2>Runtime Settings (cloud)</h2>
     <div id="runtime"></div>
@@ -156,7 +170,49 @@ async function loadConfig() {
   document.getElementById('config').innerHTML = html;
 }
 
-loadSecrets(); loadConfig(); loadRuntime();
+function setupOps() {
+  const panel = document.getElementById('ops-panel');
+  const input = document.getElementById('ops-secret');
+  const result = document.getElementById('ops-result');
+  const stored = localStorage.getItem('cron_secret') || '';
+  if (stored) input.placeholder = 'saved ✓ (paste to replace)';
+
+  document.getElementById('ops-secret-save').addEventListener('click', () => {
+    if (input.value.trim()) {
+      localStorage.setItem('cron_secret', input.value.trim());
+      input.value = ''; input.placeholder = 'saved ✓ (paste to replace)';
+      flash('CRON_SECRET saved in this browser.', true);
+    }
+  });
+
+  const call = async (path, btn, label) => {
+    const secret = localStorage.getItem('cron_secret');
+    if (!secret) { flash('קודם הדבק ושמור את ה-CRON_SECRET למעלה', false); return; }
+    btn.disabled = true; result.textContent = `${label}…`;
+    try {
+      const res = await fetch(`${path}?secret=${encodeURIComponent(secret)}`);
+      const body = await res.json();
+      result.textContent = JSON.stringify(body, null, 2);
+      flash(res.ok && (body.ok !== false) ? `${label}: הצליח ✓` : `${label}: נכשל — ראה פירוט למטה`, res.ok && (body.ok !== false));
+    } catch (e) { result.textContent = String(e); flash(`${label}: ${e.message}`, false); }
+    btn.disabled = false;
+  };
+
+  document.getElementById('btn-tick').addEventListener('click',
+    ev => call('/api/tick', ev.target, 'Tick'));
+  document.getElementById('btn-webhook').addEventListener('click',
+    ev => call('/api/setup-telegram', ev.target, 'Telegram webhook'));
+  return panel;
+}
+
+async function detectCloud() {
+  try {
+    const res = await fetch('/api/runtime-settings');
+    if (res.ok) document.getElementById('ops-panel').hidden = false;
+  } catch (e) { /* local mode */ }
+}
+
+loadSecrets(); loadConfig(); loadRuntime(); setupOps(); detectCloud();
 </script>
 </body>
 </html>

@@ -18,11 +18,27 @@
   let priceLines = [];
   let markers = [];
 
+  function banner(msg, isError) {
+    const el = document.getElementById('banner');
+    if (!msg) { el.hidden = true; return; }
+    el.innerHTML = msg;
+    el.className = isError ? 'error' : '';
+    el.hidden = false;
+  }
+
   async function loadCandles(tf) {
-    const res = await fetch(`/api/candles?tf=${tf}&limit=500`);
-    const bars = await res.json();
-    series.setData(bars);
-    chart.timeScale().fitContent();
+    try {
+      const res = await fetch(`/api/candles?tf=${tf}&limit=500`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const bars = await res.json();
+      if (!Array.isArray(bars) || !bars.length) throw new Error('empty response');
+      series.setData(bars);
+      chart.timeScale().fitContent();
+      return true;
+    } catch (e) {
+      banner(`⚠️ לא ניתן לטעון נתוני שוק מ-Bybit (${e.message}) — בדוק את <a href="/api/health">/api/health</a>: אם ה-region אמריקאי, Bybit חוסם אותו.`, true);
+      return false;
+    }
   }
 
   function clearOverlays() {
@@ -75,9 +91,21 @@
 
   const kv = (k, v, cls = '') => `<div><span class="k">${k}</span><span class="${cls}">${v}</span></div>`;
 
+  let candlesOk = true;
   async function loadState() {
     try {
       const s = await (await fetch('/api/state')).json();
+      // engine-not-started banner (only when the chart itself is fine)
+      if (candlesOk) {
+        if (!s.last_tick_ms) {
+          banner(`⏳ המנוע עוד לא הופעל אף פעם — היכנס ל-<a href="/settings">Backoffice</a> ולחץ "Run tick now", ואז הגדר cron דקתי (ראה DEPLOY.md).`);
+        } else if (!s.feed_ok) {
+          const mins = Math.round((Date.now() - s.last_tick_ms) / 60000);
+          banner(`⚠️ ה-tick האחרון רץ לפני ${mins} דקות — ה-cron הדקתי לא פעיל. בדוק את cron-job.org.`);
+        } else {
+          banner(null);
+        }
+      }
       let html = '';
       html += kv('price', s.price ? s.price.toFixed(2) : '–');
       for (const [tf, b] of Object.entries(s.biases || {}))
@@ -155,7 +183,7 @@
     });
   });
 
-  loadCandles(currentTf).then(loadSignals);
+  loadCandles(currentTf).then(ok => { candlesOk = ok; return loadSignals(); });
   loadState(); loadStats();
   setInterval(loadState, 10000);
   setInterval(loadStats, 30000);

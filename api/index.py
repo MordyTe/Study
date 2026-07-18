@@ -58,7 +58,12 @@ ENV_SECRETS = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "GEMINI_API_KEY",
 
 @app.get("/api/health")
 async def health():
-    """Deployment diagnostics — booleans only, never secret values."""
+    """Deployment diagnostics — booleans only, never secret values.
+
+    Includes live connectivity probes so a single screenshot answers:
+    which region are we in, can we reach Bybit (geo-block check),
+    can we reach Supabase, and has the tick engine ever run.
+    """
     config_ok, config_err = False, None
     if _boot_error is None:
         try:
@@ -66,18 +71,45 @@ async def health():
             config_ok = True
         except Exception as e:
             config_err = repr(e)
-    return {
+
+    out = {
         "boot_ok": _boot_error is None,
         "boot_error": _boot_error,
-        "python": sys.version,
-        "root": str(ROOT),
-        "config_yaml_exists": CONFIG_FILE.exists(),
+        "python": sys.version.split()[0],
+        "region": os.environ.get("VERCEL_REGION", "unknown"),
         "config_loads": config_ok,
         "config_error": config_err,
         "static_dir_exists": STATIC_DIR.exists(),
-        "static_files": sorted(p.name for p in STATIC_DIR.glob("*"))[:10] if STATIC_DIR.exists() else [],
         "env_set": {k: bool(os.environ.get(k)) for k in ENV_SECRETS},
     }
+    if _boot_error is not None:
+        return out
+
+    # -- Bybit probe (catches US-region geo blocks) --
+    try:
+        cfg = load_config(ROOT)
+        rest = BybitRest(cfg)
+        t = await rest.get_tickers("linear", cfg.symbols["linear"])
+        out["bybit"] = {"ok": True, "last_price": t.get("lastPrice"),
+                        "funding": t.get("fundingRate")}
+    except Exception as e:
+        out["bybit"] = {"ok": False, "error": str(e)[:300],
+                        "hint": "if region is a US one (iad1/sfo1/...), Bybit geo-blocks it — "
+                                "set Function Region to Frankfurt (fra1) in Vercel project settings"}
+
+    # -- Supabase probe --
+    try:
+        r = repo()
+        tick_state = await r.get_state("tick", {}) or {}
+        out["supabase"] = {"ok": True}
+        out["tick_ever_ran"] = bool(tick_state.get("last_run_ms"))
+        out["last_tick_ms"] = tick_state.get("last_run_ms")
+        out["tick_fresh"] = bool(tick_state.get("last_run_ms")) and \
+            now_ms() - int(tick_state.get("last_run_ms", 0)) < 180_000
+    except Exception as e:
+        out["supabase"] = {"ok": False, "error": str(e)[:300]}
+        out["tick_ever_ran"] = None
+    return out
 
 
 if _boot_error is not None:
@@ -120,6 +152,31 @@ else:
         except Exception as e:
             log.exception("tick failed")
             return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+    # ------------------------------------------ one-tap telegram webhook setup
+    @app.get("/api/setup-telegram")
+    async def setup_telegram(request: Request, authorization: str | None = Header(None)):
+        """Registers this deployment as the bot's webhook — no manual curl."""
+        _check_cron_auth(request, authorization)
+        token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        hook_secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
+        if not token:
+            return JSONResponse({"ok": False, "error": "TELEGRAM_BOT_TOKEN not set"}, 500)
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+        webhook_url = f"https://{host}/api/telegram"
+        import httpx
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(
+                f"https://api.telegram.org/bot{token}/setWebhook",
+                params={"url": webhook_url, "secret_token": hook_secret,
+                        "drop_pending_updates": "true"},
+            )
+            tg_resp = r.json()
+            info = (await client.get(
+                f"https://api.telegram.org/bot{token}/getWebhookInfo")).json()
+        return {"ok": tg_resp.get("ok", False), "webhook_url": webhook_url,
+                "telegram_response": tg_resp.get("description"),
+                "webhook_info": info.get("result", {}).get("url")}
 
     # ------------------------------------------------------ telegram webhook
     @app.post("/api/telegram")
