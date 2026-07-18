@@ -37,12 +37,18 @@
   <div class="panel">
     <h2>API Keys</h2>
     <div id="secrets"></div>
-    <div class="note">
-      Keys are stored in the local <code>.env</code> file (git-ignored, chmod 600) and shown masked.
-      Changes take effect after restarting the agent. The dashboard is bound to 127.0.0.1 — it is not
-      reachable from the network.
+    <div class="note" id="secrets-note">
+      Local mode: keys are stored in the local <code>.env</code> file (git-ignored, chmod 600), shown masked.
+      Cloud mode: keys live in Vercel → Project → Settings → Environment Variables; this page only shows
+      whether each one is set.
     </div>
     <div id="flash" class="flash"></div>
+  </div>
+
+  <div class="panel" style="margin-top:12px" id="runtime-panel" hidden>
+    <h2>Runtime Settings (cloud)</h2>
+    <div id="runtime"></div>
+    <div class="note">Stored in Supabase and applied on the next tick — no redeploy needed.</div>
   </div>
 
   <div class="panel" style="margin-top:12px">
@@ -67,6 +73,14 @@ async function loadSecrets() {
   rows.forEach(r => {
     const div = document.createElement('div');
     div.className = 'secret-row';
+    if (r.readonly) {
+      div.innerHTML = `
+        <label>${r.label}</label>
+        <span class="cur">${r.is_set ? '✅ set' : '❌ not set'}</span>
+        <span class="cur">env var</span>`;
+      wrap.appendChild(div);
+      return;
+    }
     div.innerHTML = `
       <label>${r.label}<br><span class="cur">${r.is_set ? r.masked : 'not set'}</span></label>
       <input type="${r.key.includes('CHAT_ID') ? 'text' : 'password'}" placeholder="enter new value" autocomplete="off">
@@ -91,6 +105,41 @@ async function loadSecrets() {
   });
 }
 
+async function loadRuntime() {
+  try {
+    const res = await fetch('/api/runtime-settings');
+    if (!res.ok) return;                       // local mode: endpoint absent
+    const rows = await res.json();
+    document.getElementById('runtime-panel').hidden = false;
+    const wrap = document.getElementById('runtime');
+    wrap.innerHTML = '';
+    rows.forEach(r => {
+      const div = document.createElement('div');
+      div.className = 'secret-row';
+      div.innerHTML = `
+        <label>${r.label}<br><span class="cur">effective: ${r.effective}</span></label>
+        <input type="text" value="${r.value || ''}" placeholder="override (empty = config.yaml default)">
+        <button class="save">Save</button>`;
+      const input = div.querySelector('input');
+      const btn = div.querySelector('button');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const res2 = await fetch('/api/runtime-settings', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: r.key, value: input.value }),
+          });
+          if (!res2.ok) throw new Error((await res2.json()).detail || res2.statusText);
+          flash(`${r.label} saved — applies on next tick.`, true);
+          loadRuntime();
+        } catch (e) { flash(`Failed: ${e.message}`, false); }
+        btn.disabled = false;
+      });
+      wrap.appendChild(div);
+    });
+  } catch (e) { /* local mode */ }
+}
+
 async function loadConfig() {
   const c = await (await fetch('/api/config')).json();
   const kv = (k, v) => `<div><span class="k">${k}</span><span>${v}</span></div>`;
@@ -107,7 +156,7 @@ async function loadConfig() {
   document.getElementById('config').innerHTML = html;
 }
 
-loadSecrets(); loadConfig();
+loadSecrets(); loadConfig(); loadRuntime();
 </script>
 </body>
 </html>

@@ -107,12 +107,37 @@
     } catch (e) { /* ignore */ }
   }
 
-  // WebSocket live updates
-  function connectWs() {
-    const ws = new WebSocket(`ws://${location.host}/ws`);
+  // Live updates: WebSocket locally, polling fallback on serverless (Vercel)
+  let wsFailures = 0;
+  let pollTimer = null;
+
+  function startPolling() {
+    if (pollTimer) return;
     const badge = document.getElementById('conn');
-    ws.onopen = () => { badge.textContent = 'live'; badge.className = 'badge on'; };
-    ws.onclose = () => { badge.textContent = 'reconnecting…'; badge.className = 'badge off'; setTimeout(connectWs, 3000); };
+    badge.textContent = 'cloud · polling';
+    badge.className = 'badge on';
+    pollTimer = setInterval(async () => {
+      try {
+        const bars = await (await fetch(`/api/candles?tf=${currentTf}&limit=2`)).json();
+        bars.forEach(b => series.update(b));
+      } catch (e) { /* transient */ }
+    }, 20000);
+    setInterval(() => { loadSignals(); }, 60000);
+  }
+
+  function connectWs() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const badge = document.getElementById('conn');
+    let ws;
+    try { ws = new WebSocket(`${proto}://${location.host}/ws`); }
+    catch (e) { startPolling(); return; }
+    ws.onopen = () => { wsFailures = 0; badge.textContent = 'live'; badge.className = 'badge on'; };
+    ws.onclose = () => {
+      wsFailures += 1;
+      if (wsFailures >= 2) { startPolling(); return; }  // serverless: no WS — poll instead
+      badge.textContent = 'reconnecting…'; badge.className = 'badge off';
+      setTimeout(connectWs, 3000);
+    };
     ws.onmessage = ev => {
       const msg = JSON.parse(ev.data);
       if (msg.type === 'candle' && msg.tf === currentTf) series.update(msg.bar);
