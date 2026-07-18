@@ -4,16 +4,21 @@
 - /api/tick        the minute tick (protected by CRON_SECRET)
 - /api/telegram    Telegram webhook (protected by secret token header)
 - /api/*           dashboard data endpoints (Bybit REST proxy + Supabase)
-- /settings        cloud backoffice (runtime settings in Supabase;
-                   secrets themselves live in Vercel env vars)
+- /api/health      startup diagnostics (always available)
+- /settings        cloud backoffice
 
 Deploy region must be non-US (e.g. fra1) — Bybit blocks US IPs.
+
+Startup is crash-proof: if anything fails at import time, the app still
+boots and serves the captured traceback from every route, so a broken
+deploy is diagnosable from the browser instead of an opaque 500.
 """
 from __future__ import annotations
 
 import logging
 import os
 import sys
+import traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,280 +29,314 @@ from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
-from agent.config import load_config  # noqa: E402
-from agent.cloud.supabase_repo import SupabaseRepo  # noqa: E402
-from agent.cloud.telegram_http import TelegramHttp  # noqa: E402
-from agent.cloud.tick import apply_runtime_overrides, run_tick  # noqa: E402
-from agent.data.bybit_rest import BybitRest  # noqa: E402
-from agent.delivery import formatting as fmt  # noqa: E402
-from agent.models import now_ms  # noqa: E402
-
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("api")
 
-app = FastAPI(title="ETH Signal Agent (cloud)")
 STATIC_DIR = ROOT / "agent" / "web" / "static"
+CONFIG_FILE = ROOT / "config" / "config.yaml"
 
-_repo: SupabaseRepo | None = None
+# ---- guarded agent imports: never let a boot failure become an opaque 500
+_boot_error: str | None = None
+try:
+    from agent.config import load_config
+    from agent.cloud.supabase_repo import SupabaseRepo
+    from agent.cloud.telegram_http import TelegramHttp
+    from agent.cloud.tick import apply_runtime_overrides, run_tick
+    from agent.data.bybit_rest import BybitRest
+    from agent.delivery import formatting as fmt
+    from agent.models import now_ms
+except Exception:
+    _boot_error = traceback.format_exc()
+    log.error("agent import failed:\n%s", _boot_error)
 
-
-def repo() -> SupabaseRepo:
-    global _repo
-    if _repo is None:
-        _repo = SupabaseRepo()
-    return _repo
-
-
-def _check_cron_auth(request: Request, authorization: str | None) -> None:
-    secret = os.environ.get("CRON_SECRET", "")
-    if not secret:
-        raise HTTPException(500, "CRON_SECRET not configured")
-    supplied = request.query_params.get("secret") or (
-        authorization.removeprefix("Bearer ").strip() if authorization else ""
-    )
-    if supplied != secret:
-        raise HTTPException(401, "bad secret")
-
-
-# ---------------------------------------------------------------- tick
-@app.get("/api/tick")
-@app.post("/api/tick")
-async def tick(request: Request, authorization: str | None = Header(None)):
-    _check_cron_auth(request, authorization)
-    cfg = load_config(ROOT)
-    try:
-        result = await run_tick(cfg, repo())
-        return result
-    except Exception as e:
-        log.exception("tick failed")
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
-
-
-# ---------------------------------------------------------------- telegram webhook
-@app.post("/api/telegram")
-async def telegram_webhook(
-    request: Request,
-    x_telegram_bot_api_secret_token: str | None = Header(None),
-):
-    expected = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
-    if expected and x_telegram_bot_api_secret_token != expected:
-        raise HTTPException(401, "bad webhook token")
-    update = await request.json()
-    tg = TelegramHttp()
-    if not tg.allowed_update(update):
-        return {"ok": True}
-    cmd = tg.command_of(update)
-    if cmd is None:
-        return {"ok": True}
-
-    r = repo()
-    if cmd in ("start", "help"):
-        await tg.send(
-            "<b>ETH/USDT Signal Agent (cloud)</b>\n"
-            "/status — market state and open signals\n"
-            "/analyze — on-demand Gemini analysis\n"
-            "/signals — recent signals\n/stats — performance"
-        )
-    elif cmd == "status":
-        market = await r.get_state("market", {}) or {}
-        tick_state = await r.get_state("tick", {}) or {}
-        stats = await r.resolved_stats()
-        open_sigs = await r.load_open_signals()
-        fresh = now_ms() - int(tick_state.get("last_run_ms", 0)) < 180_000
-        await tg.send(fmt.status_message(
-            feed_ok=fresh, biases=market.get("biases", {}),
-            deriv=market.get("deriv"), open_signals=open_sigs, stats=stats,
-        ))
-    elif cmd == "signals":
-        rows = await r.recent_signals(10)
-        if not rows:
-            await tg.send("No signals yet.")
-        else:
-            lines = ["<b>Recent signals</b>"]
-            for row in rows:
-                lines.append(
-                    f"#{row['id']} {row['style']} {row['direction'].upper()} "
-                    f"{row['entry_lo']}-{row['entry_hi']} · {row['state']}"
-                    + (f" · {row['realized_r']:+}R" if row["realized_r"] is not None else "")
-                )
-            await tg.send("\n".join(lines))
-    elif cmd == "stats":
-        await tg.send(fmt.stats_message(await r.resolved_stats()))
-    elif cmd == "analyze":
-        await tg.send("🔍 Running full analysis…")
-        try:
-            text = await _run_analysis()
-            await tg.send(text)
-        except Exception as e:
-            await tg.send(f"analysis failed: {e}")
-    return {"ok": True}
-
-
-async def _run_analysis() -> str:
-    from agent.bus import Bus
-    from agent.data.candles import CandleStore
-    from agent.data.derivatives import DerivativesState
-    from agent.engine.context import ContextBuilder
-    from agent.llm.gemini import GeminiAnalyst
-
-    cfg = load_config(ROOT)
-    rest = BybitRest(cfg)
-    bus = Bus()
-    store = CandleStore(bus, cfg.active_tfs, cfg.buffer_bars)
-    sc = cfg.styles["intraday"]
-    tfs = list(dict.fromkeys([sc.entry_tf, *sc.gate_tfs, "D"]))
-    for tf in tfs:
-        store.seed(cfg.signal_market, tf,
-                   await rest.backfill(cfg.signal_market, cfg.signal_symbol, tf, 800))
-    deriv = DerivativesState()
-    try:
-        deriv.on_ticker(await rest.get_tickers("linear", cfg.symbols["linear"]))
-        deriv.set_oi_series(await rest.get_open_interest(cfg.symbols["linear"]))
-    except Exception:
-        pass
-    builder = ContextBuilder(cfg, store, flow=None, deriv=deriv)
-    ctx = builder.build(cfg.signal_market, sc.entry_tf, tfs, now_ms())
-    if ctx is None:
-        return "Not enough data yet."
-    llm = GeminiAnalyst(cfg)
-    report = await llm.regime_report(ctx)
-    return report or "LLM unavailable — set GEMINI_API_KEY in Vercel env vars."
-
-
-# ---------------------------------------------------------------- dashboard data
-@app.get("/api/candles")
-async def candles(tf: str = "5", limit: int = 500):
-    cfg = load_config(ROOT)
-    rest = BybitRest(cfg)
-    rows = await rest.get_klines(cfg.signal_market, cfg.signal_symbol, tf,
-                                 limit=min(limit, 1000))
-    return [
-        {"time": int(c.ts / 1000), "open": c.open, "high": c.high,
-         "low": c.low, "close": c.close, "volume": c.volume}
-        for c in rows
-    ]
-
-
-@app.get("/api/signals")
-async def signals(limit: int = 50):
-    return await repo().recent_signals(limit)
-
-
-@app.get("/api/stats")
-async def stats():
-    return await repo().resolved_stats()
-
-
-@app.get("/api/state")
-async def state():
-    r = repo()
-    market = await r.get_state("market", {}) or {}
-    tick_state = await r.get_state("tick", {}) or {}
-    cvd = None
-    return {
-        "price": market.get("price"),
-        "biases": market.get("biases", {}),
-        "deriv": market.get("deriv"),
-        "cvd_30m": cvd,
-        "feed_ok": now_ms() - int(tick_state.get("last_run_ms", 0)) < 180_000,
-        "last_tick_ms": tick_state.get("last_run_ms"),
-    }
-
-
-# ---------------------------------------------------------------- cloud backoffice
-RUNTIME_KEYS = {
-    "confluence_threshold": "Confluence threshold (e.g. 0.55)",
-    "htf_gate_mode": "HTF gate mode (hard/soft)",
-    "risk_pct": "Risk % per trade",
-    "account_equity_usd": "Account equity USD",
-    "llm_veto_mode": "LLM veto mode (annotate/suppress)",
-}
+app = FastAPI(title="ETH Signal Agent (cloud)")
 
 ENV_SECRETS = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "GEMINI_API_KEY",
                "SUPABASE_URL", "SUPABASE_SERVICE_KEY", "CRON_SECRET",
                "TELEGRAM_WEBHOOK_SECRET"]
 
 
-class SettingUpdate(BaseModel):
-    key: str
-    value: str
-
-
-@app.get("/api/secrets")
-async def cloud_secrets():
-    # Cloud: secrets are Vercel env vars — report set/unset only, never values
-    return [
-        {"key": k, "label": k, "is_set": bool(os.environ.get(k)),
-         "masked": "set via Vercel env" if os.environ.get(k) else "", "readonly": True}
-        for k in ENV_SECRETS
-    ]
-
-
-@app.get("/api/runtime-settings")
-async def runtime_settings():
-    stored = await repo().get_settings()
-    cfg = load_config(ROOT)
-    apply_runtime_overrides(cfg, stored)
-    return [
-        {"key": k, "label": label, "value": stored.get(k, ""),
-         "effective": _effective(cfg, k)}
-        for k, label in RUNTIME_KEYS.items()
-    ]
-
-
-def _effective(cfg, key: str):
-    return {
-        "confluence_threshold": cfg.confluence.threshold,
-        "htf_gate_mode": cfg.confluence.htf_gate_mode,
-        "risk_pct": cfg.risk.risk_pct,
-        "account_equity_usd": cfg.risk.account_equity_usd,
-        "llm_veto_mode": cfg.llm.veto_mode,
-    }.get(key)
-
-
-@app.post("/api/runtime-settings")
-async def set_runtime_setting(update: SettingUpdate):
-    if update.key not in RUNTIME_KEYS:
-        raise HTTPException(400, f"unknown setting: {update.key}")
-    v = update.value.strip()
-    if update.key in ("confluence_threshold", "risk_pct", "account_equity_usd") and v:
+@app.get("/api/health")
+async def health():
+    """Deployment diagnostics — booleans only, never secret values."""
+    config_ok, config_err = False, None
+    if _boot_error is None:
         try:
-            float(v)
-        except ValueError:
-            raise HTTPException(400, "numeric value required")
-    if update.key == "htf_gate_mode" and v not in ("", "hard", "soft"):
-        raise HTTPException(400, "hard or soft")
-    if update.key == "llm_veto_mode" and v not in ("", "annotate", "suppress"):
-        raise HTTPException(400, "annotate or suppress")
-    await repo().set_setting(update.key, v)
-    return {"ok": True, "applied": "next tick"}
-
-
-@app.get("/api/config")
-async def get_config():
-    cfg = load_config(ROOT)
-    apply_runtime_overrides(cfg, await repo().get_settings())
+            load_config(ROOT)
+            config_ok = True
+        except Exception as e:
+            config_err = repr(e)
     return {
-        "signal_market": cfg.signal_market,
-        "symbol": cfg.signal_symbol,
-        "confluence": cfg.confluence.model_dump(),
-        "risk": cfg.risk.model_dump(),
-        "llm": {"enabled": cfg.llm.enabled, "veto_mode": cfg.llm.veto_mode,
-                "validate_model": cfg.llm.validate_model},
-        "styles": {k: v.model_dump() for k, v in cfg.styles.items()},
-        "mode": "cloud",
+        "boot_ok": _boot_error is None,
+        "boot_error": _boot_error,
+        "python": sys.version,
+        "root": str(ROOT),
+        "config_yaml_exists": CONFIG_FILE.exists(),
+        "config_loads": config_ok,
+        "config_error": config_err,
+        "static_dir_exists": STATIC_DIR.exists(),
+        "static_files": sorted(p.name for p in STATIC_DIR.glob("*"))[:10] if STATIC_DIR.exists() else [],
+        "env_set": {k: bool(os.environ.get(k)) for k in ENV_SECRETS},
     }
 
 
-# ---------------------------------------------------------------- pages
-@app.get("/")
-async def index():
-    return FileResponse(STATIC_DIR / "index.html")
+if _boot_error is not None:
+    # Fallback mode: every route reports the boot failure.
+    @app.api_route("/{path:path}", methods=["GET", "POST"])
+    async def boot_failed(path: str):
+        return JSONResponse(
+            {"error": "agent failed to import at startup",
+             "traceback": _boot_error,
+             "hint": "see /api/health"},
+            status_code=500,
+        )
+else:
+    _repo: "SupabaseRepo | None" = None
 
+    def repo() -> "SupabaseRepo":
+        global _repo
+        if _repo is None:
+            _repo = SupabaseRepo()
+        return _repo
 
-@app.get("/settings")
-async def settings_page():
-    return FileResponse(STATIC_DIR / "settings.html")
+    def _check_cron_auth(request: Request, authorization: str | None) -> None:
+        secret = os.environ.get("CRON_SECRET", "")
+        if not secret:
+            raise HTTPException(500, "CRON_SECRET not configured")
+        supplied = request.query_params.get("secret") or (
+            authorization.removeprefix("Bearer ").strip() if authorization else ""
+        )
+        if supplied != secret:
+            raise HTTPException(401, "bad secret")
 
+    # ---------------------------------------------------------------- tick
+    @app.get("/api/tick")
+    @app.post("/api/tick")
+    async def tick(request: Request, authorization: str | None = Header(None)):
+        _check_cron_auth(request, authorization)
+        cfg = load_config(ROOT)
+        try:
+            return await run_tick(cfg, repo())
+        except Exception as e:
+            log.exception("tick failed")
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    # ------------------------------------------------------ telegram webhook
+    @app.post("/api/telegram")
+    async def telegram_webhook(
+        request: Request,
+        x_telegram_bot_api_secret_token: str | None = Header(None),
+    ):
+        expected = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
+        if expected and x_telegram_bot_api_secret_token != expected:
+            raise HTTPException(401, "bad webhook token")
+        update = await request.json()
+        tg = TelegramHttp()
+        if not tg.allowed_update(update):
+            return {"ok": True}
+        cmd = tg.command_of(update)
+        if cmd is None:
+            return {"ok": True}
+
+        r = repo()
+        if cmd in ("start", "help"):
+            await tg.send(
+                "<b>ETH/USDT Signal Agent (cloud)</b>\n"
+                "/status — market state and open signals\n"
+                "/analyze — on-demand Gemini analysis\n"
+                "/signals — recent signals\n/stats — performance"
+            )
+        elif cmd == "status":
+            market = await r.get_state("market", {}) or {}
+            tick_state = await r.get_state("tick", {}) or {}
+            stats = await r.resolved_stats()
+            open_sigs = await r.load_open_signals()
+            fresh = now_ms() - int(tick_state.get("last_run_ms", 0)) < 180_000
+            await tg.send(fmt.status_message(
+                feed_ok=fresh, biases=market.get("biases", {}),
+                deriv=market.get("deriv"), open_signals=open_sigs, stats=stats,
+            ))
+        elif cmd == "signals":
+            rows = await r.recent_signals(10)
+            if not rows:
+                await tg.send("No signals yet.")
+            else:
+                lines = ["<b>Recent signals</b>"]
+                for row in rows:
+                    lines.append(
+                        f"#{row['id']} {row['style']} {row['direction'].upper()} "
+                        f"{row['entry_lo']}-{row['entry_hi']} · {row['state']}"
+                        + (f" · {row['realized_r']:+}R" if row["realized_r"] is not None else "")
+                    )
+                await tg.send("\n".join(lines))
+        elif cmd == "stats":
+            await tg.send(fmt.stats_message(await r.resolved_stats()))
+        elif cmd == "analyze":
+            await tg.send("🔍 Running full analysis…")
+            try:
+                await tg.send(await _run_analysis())
+            except Exception as e:
+                await tg.send(f"analysis failed: {e}")
+        return {"ok": True}
+
+    async def _run_analysis() -> str:
+        from agent.bus import Bus
+        from agent.data.candles import CandleStore
+        from agent.data.derivatives import DerivativesState
+        from agent.engine.context import ContextBuilder
+        from agent.llm.gemini import GeminiAnalyst
+
+        cfg = load_config(ROOT)
+        rest = BybitRest(cfg)
+        bus = Bus()
+        store = CandleStore(bus, cfg.active_tfs, cfg.buffer_bars)
+        sc = cfg.styles["intraday"]
+        tfs = list(dict.fromkeys([sc.entry_tf, *sc.gate_tfs, "D"]))
+        for tf in tfs:
+            store.seed(cfg.signal_market, tf,
+                       await rest.backfill(cfg.signal_market, cfg.signal_symbol, tf, 800))
+        deriv = DerivativesState()
+        try:
+            deriv.on_ticker(await rest.get_tickers("linear", cfg.symbols["linear"]))
+            deriv.set_oi_series(await rest.get_open_interest(cfg.symbols["linear"]))
+        except Exception:
+            pass
+        builder = ContextBuilder(cfg, store, flow=None, deriv=deriv)
+        ctx = builder.build(cfg.signal_market, sc.entry_tf, tfs, now_ms())
+        if ctx is None:
+            return "Not enough data yet."
+        llm = GeminiAnalyst(cfg)
+        report = await llm.regime_report(ctx)
+        return report or "LLM unavailable — set GEMINI_API_KEY in Vercel env vars."
+
+    # ------------------------------------------------------- dashboard data
+    @app.get("/api/candles")
+    async def candles(tf: str = "5", limit: int = 500):
+        cfg = load_config(ROOT)
+        rest = BybitRest(cfg)
+        rows = await rest.get_klines(cfg.signal_market, cfg.signal_symbol, tf,
+                                     limit=min(limit, 1000))
+        return [
+            {"time": int(c.ts / 1000), "open": c.open, "high": c.high,
+             "low": c.low, "close": c.close, "volume": c.volume}
+            for c in rows
+        ]
+
+    @app.get("/api/signals")
+    async def signals(limit: int = 50):
+        return await repo().recent_signals(limit)
+
+    @app.get("/api/stats")
+    async def stats():
+        return await repo().resolved_stats()
+
+    @app.get("/api/state")
+    async def state():
+        r = repo()
+        market = await r.get_state("market", {}) or {}
+        tick_state = await r.get_state("tick", {}) or {}
+        return {
+            "price": market.get("price"),
+            "biases": market.get("biases", {}),
+            "deriv": market.get("deriv"),
+            "cvd_30m": None,
+            "feed_ok": now_ms() - int(tick_state.get("last_run_ms", 0)) < 180_000,
+            "last_tick_ms": tick_state.get("last_run_ms"),
+        }
+
+    # --------------------------------------------------- cloud backoffice
+    RUNTIME_KEYS = {
+        "confluence_threshold": "Confluence threshold (e.g. 0.55)",
+        "htf_gate_mode": "HTF gate mode (hard/soft)",
+        "risk_pct": "Risk % per trade",
+        "account_equity_usd": "Account equity USD",
+        "llm_veto_mode": "LLM veto mode (annotate/suppress)",
+    }
+
+    class SettingUpdate(BaseModel):
+        key: str
+        value: str
+
+    @app.get("/api/secrets")
+    async def cloud_secrets():
+        # Cloud: secrets are Vercel env vars — report set/unset only, never values
+        return [
+            {"key": k, "label": k, "is_set": bool(os.environ.get(k)),
+             "masked": "set via Vercel env" if os.environ.get(k) else "", "readonly": True}
+            for k in ENV_SECRETS
+        ]
+
+    @app.get("/api/runtime-settings")
+    async def runtime_settings():
+        stored = await repo().get_settings()
+        cfg = load_config(ROOT)
+        apply_runtime_overrides(cfg, stored)
+        return [
+            {"key": k, "label": label, "value": stored.get(k, ""),
+             "effective": _effective(cfg, k)}
+            for k, label in RUNTIME_KEYS.items()
+        ]
+
+    def _effective(cfg, key: str):
+        return {
+            "confluence_threshold": cfg.confluence.threshold,
+            "htf_gate_mode": cfg.confluence.htf_gate_mode,
+            "risk_pct": cfg.risk.risk_pct,
+            "account_equity_usd": cfg.risk.account_equity_usd,
+            "llm_veto_mode": cfg.llm.veto_mode,
+        }.get(key)
+
+    @app.post("/api/runtime-settings")
+    async def set_runtime_setting(update: SettingUpdate):
+        if update.key not in RUNTIME_KEYS:
+            raise HTTPException(400, f"unknown setting: {update.key}")
+        v = update.value.strip()
+        if update.key in ("confluence_threshold", "risk_pct", "account_equity_usd") and v:
+            try:
+                float(v)
+            except ValueError:
+                raise HTTPException(400, "numeric value required")
+        if update.key == "htf_gate_mode" and v not in ("", "hard", "soft"):
+            raise HTTPException(400, "hard or soft")
+        if update.key == "llm_veto_mode" and v not in ("", "annotate", "suppress"):
+            raise HTTPException(400, "annotate or suppress")
+        await repo().set_setting(update.key, v)
+        return {"ok": True, "applied": "next tick"}
+
+    @app.get("/api/config")
+    async def get_config():
+        cfg = load_config(ROOT)
+        apply_runtime_overrides(cfg, await repo().get_settings())
+        return {
+            "signal_market": cfg.signal_market,
+            "symbol": cfg.signal_symbol,
+            "confluence": cfg.confluence.model_dump(),
+            "risk": cfg.risk.model_dump(),
+            "llm": {"enabled": cfg.llm.enabled, "veto_mode": cfg.llm.veto_mode,
+                    "validate_model": cfg.llm.validate_model},
+            "styles": {k: v.model_dump() for k, v in cfg.styles.items()},
+            "mode": "cloud",
+        }
+
+    # ---------------------------------------------------------------- pages
+    def _page(name: str):
+        path = STATIC_DIR / name
+        if path.exists():
+            return FileResponse(path)
+        return JSONResponse(
+            {"error": f"{name} missing from deployment bundle", "hint": "see /api/health"},
+            status_code=500,
+        )
+
+    @app.get("/")
+    async def index():
+        return _page("index.html")
+
+    @app.get("/settings")
+    async def settings_page():
+        return _page("settings.html")
+
+    if STATIC_DIR.exists():
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    else:
+        log.error("static dir missing at %s — dashboard assets unavailable", STATIC_DIR)
