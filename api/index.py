@@ -136,24 +136,46 @@ else:
             _repo = SupabaseRepo()
         return _repo
 
-    def _check_cron_auth(request: Request, authorization: str | None) -> None:
-        secret = os.environ.get("CRON_SECRET", "")
-        if not secret:
-            raise HTTPException(500, "CRON_SECRET not configured")
+    _token_cache: dict = {"value": None, "ts": 0}
+
+    async def _db_tick_token() -> str | None:
+        """Auto-generated token stored in Supabase (service-role-only readable).
+        Lets the built-in pg_cron scheduler authenticate without anyone ever
+        typing the CRON_SECRET."""
+        if _token_cache["value"] and now_ms() - _token_cache["ts"] < 60_000:
+            return _token_cache["value"]
+        try:
+            tok = await repo().get_state("tick_token", None)
+            if isinstance(tok, dict):
+                tok = tok.get("token")
+            _token_cache.update(value=tok, ts=now_ms())
+            return tok
+        except Exception:
+            return None
+
+    async def _check_cron_auth(request: Request, authorization: str | None) -> None:
         supplied = request.query_params.get("secret") or (
             authorization.removeprefix("Bearer ").strip() if authorization else ""
         )
-        if supplied != secret:
-            raise HTTPException(401, "bad secret")
+        if not supplied:
+            raise HTTPException(401, "missing secret")
+        secret = os.environ.get("CRON_SECRET", "")
+        if secret and supplied == secret:
+            return
+        db_token = await _db_tick_token()
+        if db_token and supplied == db_token:
+            return
+        raise HTTPException(401, "bad secret")
 
     # ---------------------------------------------------------------- tick
     @app.get("/api/tick")
     @app.post("/api/tick")
     async def tick(request: Request, authorization: str | None = Header(None)):
-        _check_cron_auth(request, authorization)
+        await _check_cron_auth(request, authorization)
         cfg = load_config(ROOT)
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
         try:
-            return await run_tick(cfg, repo())
+            return await run_tick(cfg, repo(), site_host=host)
         except Exception as e:
             log.exception("tick failed")
             return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
@@ -162,7 +184,7 @@ else:
     @app.get("/api/setup-cron")
     async def setup_cron(request: Request, authorization: str | None = Header(None)):
         """Enable/disable the built-in minute scheduler — no external service."""
-        _check_cron_auth(request, authorization)
+        await _check_cron_auth(request, authorization)
         r = repo()
         if request.query_params.get("disable"):
             result = await r.rpc("ta_disable_tick")
@@ -179,7 +201,7 @@ else:
     # --------------------------------------- on-demand analysis (site-visible)
     @app.get("/api/analyze")
     async def analyze(request: Request, authorization: str | None = Header(None)):
-        _check_cron_auth(request, authorization)
+        await _check_cron_auth(request, authorization)
         try:
             text = await _run_analysis()
         except Exception as e:
@@ -192,7 +214,7 @@ else:
     @app.get("/api/setup-telegram")
     async def setup_telegram(request: Request, authorization: str | None = Header(None)):
         """Registers this deployment as the bot's webhook — no manual curl."""
-        _check_cron_auth(request, authorization)
+        await _check_cron_auth(request, authorization)
         token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
         hook_secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
         if not token:

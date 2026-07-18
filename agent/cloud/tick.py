@@ -53,7 +53,7 @@ def apply_runtime_overrides(cfg: Config, settings: dict[str, str]) -> None:
         cfg.llm.veto_mode = v
 
 
-async def run_tick(cfg: Config, repo: SupabaseRepo) -> dict:
+async def run_tick(cfg: Config, repo: SupabaseRepo, site_host: str | None = None) -> dict:
     t0 = time.monotonic()
     telegram = TelegramHttp()
     rest = BybitRest(cfg)
@@ -94,6 +94,25 @@ async def run_tick(cfg: Config, repo: SupabaseRepo) -> dict:
         engine._last_fire[(Style(style_s), Direction(dir_s))] = (int(ts), float(score))
 
     events: list[str] = []
+
+    # ---- 2.5 self-registration: telegram webhook (once, fully automatic) ---
+    webhook_set = bool(state.get("webhook_set"))
+    if site_host and telegram.enabled and not webhook_set:
+        try:
+            import os
+            import httpx
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    f"https://api.telegram.org/bot{telegram.token}/setWebhook",
+                    params={"url": f"https://{site_host}/api/telegram",
+                            "secret_token": os.environ.get("TELEGRAM_WEBHOOK_SECRET", ""),
+                            "drop_pending_updates": "true"},
+                )
+            if resp.json().get("ok"):
+                webhook_set = True
+                log.info("telegram webhook self-registered at %s", site_host)
+        except Exception as e:
+            log.warning("webhook self-registration failed: %s", e)
 
     # ---- 3. tracker over newly closed 1m candles ---------------------------
     tracker = SignalTracker(bus)
@@ -205,6 +224,7 @@ async def run_tick(cfg: Config, repo: SupabaseRepo) -> dict:
         "last_run_ms": now_ms(),
         "regime_ms": regime_ms,
         "first_tick_done": True,
+        "webhook_set": webhook_set,
     })
 
     biases = {}
