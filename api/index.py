@@ -105,8 +105,15 @@ async def health():
 
     # -- Supabase probe --
     try:
+        import httpx as _hx
         r = repo()
-        tick_state = await r.get_state("tick", {}) or {}
+        try:
+            tick_state = await r.get_state("tick", {}) or {}
+        except _hx.HTTPStatusError as he:
+            out["supabase"] = {"ok": False, "status": he.response.status_code,
+                               "gateway_says": he.response.text[:250]}
+            out["tick_ever_ran"] = None
+            return out
         out["supabase"] = {"ok": True}
         out["tick_ever_ran"] = bool(tick_state.get("last_run_ms"))
         out["last_tick_ms"] = tick_state.get("last_run_ms")
