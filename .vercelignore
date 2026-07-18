@@ -1,6 +1,7 @@
-.env
-data/
-tests/
+# Root-anchored patterns only — a bare "data/" would also strip agent/data/
+/.env
+/data/
+/tests/
 *.db
 *.db-wal
 *.db-shm
