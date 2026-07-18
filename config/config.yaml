@@ -1,0 +1,114 @@
+# ETH/USDT Signal Agent — all tunables live here. Secrets live in .env only.
+
+symbols:
+  spot: "ETHUSDT"        # Bybit spot symbol
+  linear: "ETHUSDT"      # Bybit linear perpetual symbol
+
+# Which market's candles drive signals. Derivatives data always comes from linear.
+signal_market: "linear"  # linear | spot
+
+timeframes:
+  # Bybit kline intervals. Ring buffer sized to cover EMA200 warmup + swing lookbacks.
+  active: ["1", "5", "15", "60", "240", "D"]
+  buffer_bars: 1500
+
+styles:
+  scalp:
+    enabled: true
+    entry_tf: "5"
+    trigger_tf: "1"
+    gate_tfs: ["15", "60"]
+    entry_ttl_minutes: 30
+    max_duration_minutes: 240
+    cooldown_minutes: 30
+  intraday:
+    enabled: true
+    entry_tf: "15"
+    gate_tfs: ["240", "D"]
+    entry_ttl_minutes: 240
+    max_duration_minutes: 1440
+    cooldown_minutes: 90
+
+confluence:
+  threshold: 0.55          # |weighted score| required to fire
+  min_agreeing: 3          # minimum strategies agreeing in direction
+  htf_gate_mode: "hard"    # hard = discard counter-bias candidates; soft = -0.3 penalty
+  improve_delta: 0.15      # score improvement that overrides cooldown
+
+strategy_weights:
+  trend_momentum: 1.0
+  mean_reversion: 0.8
+  vwap_bias: 0.8
+  smc: 1.4                 # the edge layer gets the heaviest vote
+  volume_flow: 0.9
+  derivatives_sentiment: 0.9
+  key_levels: 0.7
+
+strategies:
+  trend_momentum:
+    ema_periods: [9, 21, 50, 200]
+    adx_period: 14
+    adx_min: 18
+  mean_reversion:
+    rsi_period: 14
+    rsi_overbought: 70
+    rsi_oversold: 30
+    bb_period: 20
+    bb_std: 2.0
+    divergence_min_gap: 5
+    divergence_max_gap: 60
+  smc:
+    swing_k: 3               # fractal wing size; pivot confirmed k bars later
+    ob_impulse_atr: 1.5      # min impulse (in ATR) to qualify an order block
+    ob_max_age_bars: 120
+    fvg_min_atr: 0.3
+    sweep_max_atr: 0.6       # max wick-beyond-level distance for a sweep
+    sweep_reclaim_bars: 2
+  volume_flow:
+    vol_sma_period: 20
+    spike_mult: 2.0
+    large_trade_pctile: 99
+  derivatives_sentiment:
+    funding_extreme: 0.0005      # |funding| above this = crowded side
+    oi_change_pct: 2.0           # significant OI change over window (%)
+    oi_window_minutes: 60
+    liq_cascade_usd: 2_000_000   # 5m liquidation notional considered a cascade
+  key_levels:
+    round_step: 50               # ETH round numbers every $50
+    proximity_atr: 0.5
+
+risk:
+  account_equity_usd: 10000      # used for position size suggestion
+  risk_pct: 1.0                  # % of equity risked per trade
+  atr_stop_mult: 1.2
+  stop_buffer_atr: 0.1
+  min_rr_tp2: 1.5                # reject candidate if TP2 < 1.5R after level capping
+  tp3_max_r: 3.5
+  max_leverage: 5
+
+llm:
+  enabled: true
+  validate_model: "gemini-2.5-flash"
+  report_model: "gemini-2.5-pro"
+  timeout_seconds: 12
+  veto_mode: "annotate"          # annotate = deliver with warning; suppress = block delivery
+  regime_report_hours: 4
+
+telegram:
+  enabled: true
+
+web:
+  enabled: true
+  host: "127.0.0.1"
+  port: 8000
+
+store:
+  db_path: "data/agent.db"
+  backtest_db_path: "data/backtest.db"
+
+ws:
+  watchdog_timeout_seconds: 30   # no messages on a topic for this long -> rebuild socket
+  testnet: false
+
+logging:
+  level: "INFO"

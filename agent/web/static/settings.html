@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backoffice · ETH Signal Agent</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .bo-wrap { max-width: 760px; margin: 0 auto; }
+  .secret-row { display: grid; grid-template-columns: 240px 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px dashed #21262d; }
+  .secret-row label { color: var(--muted); font-size: 13px; }
+  .secret-row .cur { font-family: monospace; font-size: 12px; color: var(--muted); }
+  input[type=password], input[type=text] {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 10px; width: 100%; font-size: 13px;
+  }
+  button.save {
+    background: #1f6feb; color: #fff; border: 0; border-radius: 6px;
+    padding: 7px 16px; cursor: pointer; font-size: 13px;
+  }
+  button.save:disabled { opacity: .5; cursor: default; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .flash { margin-top: 12px; padding: 8px 12px; border-radius: 6px; font-size: 13px; display: none; }
+  .flash.ok { display: block; background: rgba(46,160,67,.15); color: var(--green); border: 1px solid var(--green); }
+  .flash.err { display: block; background: rgba(248,81,73,.15); color: var(--red); border: 1px solid var(--red); }
+  .cfg-grid { font-size: 13px; }
+  a.back { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="bo-wrap">
+  <header>
+    <h1>🔐 Backoffice</h1>
+    <a class="back" href="/">← back to dashboard</a>
+  </header>
+
+  <div class="panel">
+    <h2>API Keys</h2>
+    <div id="secrets"></div>
+    <div class="note">
+      Keys are stored in the local <code>.env</code> file (git-ignored, chmod 600) and shown masked.
+      Changes take effect after restarting the agent. The dashboard is bound to 127.0.0.1 — it is not
+      reachable from the network.
+    </div>
+    <div id="flash" class="flash"></div>
+  </div>
+
+  <div class="panel" style="margin-top:12px">
+    <h2>Active Configuration (read-only)</h2>
+    <div id="config" class="kv cfg-grid">loading…</div>
+    <div class="note">Tunables live in <code>config/config.yaml</code> — edit and restart to change.</div>
+  </div>
+</div>
+
+<script>
+const flash = (msg, ok) => {
+  const el = document.getElementById('flash');
+  el.textContent = msg;
+  el.className = 'flash ' + (ok ? 'ok' : 'err');
+  setTimeout(() => { el.className = 'flash'; }, 5000);
+};
+
+async function loadSecrets() {
+  const rows = await (await fetch('/api/secrets')).json();
+  const wrap = document.getElementById('secrets');
+  wrap.innerHTML = '';
+  rows.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'secret-row';
+    div.innerHTML = `
+      <label>${r.label}<br><span class="cur">${r.is_set ? r.masked : 'not set'}</span></label>
+      <input type="${r.key.includes('CHAT_ID') ? 'text' : 'password'}" placeholder="enter new value" autocomplete="off">
+      <button class="save">Save</button>`;
+    const input = div.querySelector('input');
+    const btn = div.querySelector('button');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/secrets', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: r.key, value: input.value }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+        flash(`${r.label} saved — restart the agent to apply.`, true);
+        input.value = '';
+        loadSecrets();
+      } catch (e) { flash(`Failed: ${e.message}`, false); }
+      btn.disabled = false;
+    });
+    wrap.appendChild(div);
+  });
+}
+
+async function loadConfig() {
+  const c = await (await fetch('/api/config')).json();
+  const kv = (k, v) => `<div><span class="k">${k}</span><span>${v}</span></div>`;
+  let html = '';
+  html += kv('market / symbol', `${c.signal_market} · ${c.symbol}`);
+  html += kv('confluence threshold', c.confluence.threshold);
+  html += kv('min agreeing strategies', c.confluence.min_agreeing);
+  html += kv('HTF gate', c.confluence.htf_gate_mode);
+  html += kv('risk per trade', c.risk.risk_pct + '% of $' + c.risk.account_equity_usd.toLocaleString());
+  html += kv('max leverage', c.risk.max_leverage + 'x');
+  html += kv('LLM', c.llm.enabled ? c.llm.validate_model + ' (veto: ' + c.llm.veto_mode + ')' : 'off');
+  for (const [name, s] of Object.entries(c.styles))
+    html += kv(`style: ${name}`, `${s.enabled ? 'on' : 'off'} · entry ${s.entry_tf}m · gates ${s.gate_tfs.join(',')}`);
+  document.getElementById('config').innerHTML = html;
+}
+
+loadSecrets(); loadConfig();
+</script>
+</body>
+</html>
