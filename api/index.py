@@ -82,6 +82,11 @@ async def health():
         "config_error": config_err,
         "static_dir_exists": STATIC_DIR.exists(),
         "env_set": {k: bool(os.environ.get(k)) for k in ENV_SECRETS},
+        # format fingerprint only (prefix + length) — never the key itself
+        "supabase_key_format": (
+            (lambda k: f"{k[:10]}… len={len(k)}")(os.environ.get("SUPABASE_SERVICE_KEY", "").strip())
+            if os.environ.get("SUPABASE_SERVICE_KEY") else "not set"
+        ),
     }
     if _boot_error is not None:
         return out
