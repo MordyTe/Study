@@ -71,7 +71,7 @@ Both fixes are covered by dedicated regression tests.
 | Limitation | Detail |
 |---|---|
 | No WebSocket streaming | Deliberate — see `docs/ARCHITECTURE.md` ADR-001. Detection uses closed candles, which the spec requires anyway. Cost: no sub-second updates, no L2 depth in Tier 2. |
-| Scan cadence is 15 minutes | Vercel Cron minimum practical interval for this workload. `Scan now` is always available. |
+| Cron is daily on the shipped config | The Vercel Hobby plan rejects any deployment whose cron is finer than daily, so `vercel.json` ships `0 6 * * *`. Use **Scan now** or a free external cron for 15-minute scans; Pro accounts can change one line. See `docs/DEPLOYMENT.md`. |
 | In-memory store is not durable | Clearly labelled in the UI, on Health, and in API responses. Supabase removes it. |
 | No probability displayed | Deliberate — see `docs/SCORING_MODEL.md`. Requires a validated calibration model that does not yet exist. |
 | Backtest liquidity components held neutral | Historical per-bar turnover and spread are not reconstructable from the kline endpoint. Documented in every backtest result's assumptions list rather than fabricated. |

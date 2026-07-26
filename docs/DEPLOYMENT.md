@@ -34,19 +34,37 @@ Numbers vary with the market — what matters is that `ok` is `true`, `linear` e
 
 If it returns `503`, read the failing check's `detail` field. It names the exact problem.
 
-## Step 3 — Confirm scanning runs
+## Step 3 — Scanning cadence
 
-`vercel.json` registers:
+`vercel.json` ships:
 
 ```json
-{ "crons": [{ "path": "/api/scan", "schedule": "*/15 * * * *" }] }
+{ "crons": [{ "path": "/api/scan", "schedule": "0 6 * * *" }] }
 ```
 
-Vercel picks this up automatically on deploy. Confirm under **Vercel → your project → Settings → Cron Jobs**.
+### Why daily, and not every 15 minutes
 
-Do not wait for the first tick — press **Scan now** on the Command Center. A scan returns a summary of instruments ranked, candidates evaluated, and setups confirmed. **Alerts → Scan history** then shows the run.
+**The Vercel Hobby plan only permits daily cron granularity.** A schedule such as `*/15 * * * *` does not merely get downgraded — Vercel **rejects the entire deployment** with a cron-limit error before the build starts, so nothing deploys at all. The shipped schedule is therefore Hobby-safe by default.
 
-> Cron jobs require a Vercel Hobby plan or higher. On plans without cron, press **Scan now** manually or call `/api/scan` from any external scheduler.
+### Getting frequent scans
+
+| Option | Cadence | Cost | Setup |
+|---|---|---|---|
+| **Scan now** | On demand | Free | Command Center → **Scan now**. Runs a full scan immediately. |
+| **External cron** | Any | Free | See below. Recommended on Hobby. |
+| **Vercel Pro** | Any | Paid | Set `"schedule": "*/15 * * * *"` in `vercel.json`, commit, redeploy. |
+
+**External cron setup** (free, works on Hobby):
+
+1. Create a job at [cron-job.org](https://cron-job.org) (or UptimeRobot, or any scheduler).
+2. URL: `https://<your-app>.vercel.app/api/scan`
+3. Method: `GET`
+4. Interval: every 15 minutes
+5. If you set `CRON_SECRET`, add a request header: `Authorization: Bearer <your secret>`
+
+The endpoint is idempotent — a scan that overlaps a previous one simply re-evaluates current market state; de-duplication by fingerprint prevents duplicate opportunities or repeated alerts.
+
+Do not wait for any schedule to verify the system works — press **Scan now**. **Alerts → Scan history** then shows the run with instruments ranked, candidates evaluated, and setups confirmed.
 
 ## Step 4 — Optional integrations
 
@@ -111,6 +129,7 @@ When set, the Settings page requires it before saving.
 | Opportunities disappear after a while | The in-memory store recycled with the serverless instance. Add Supabase. |
 | Telegram test fails | Token or chat id wrong, or you never messaged the bot first. The error detail from the Telegram API is shown verbatim. |
 | Scan times out | Lower **Tier-2 candidates per scan** in Settings. The scan self-limits at 45 seconds and reports how many candidates it deferred. |
+| Deployment rejected with a cron limit error | The schedule in `vercel.json` is finer than daily and the account is on Hobby. Use `0 6 * * *` (shipped default) and drive frequent scans with an external cron, or upgrade to Pro. |
 | Settings changes do nothing | They apply on the **next scan**. Press **Scan now**. |
 
 ## Local development

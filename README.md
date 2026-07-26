@@ -55,9 +55,17 @@ Add these in **Vercel → Settings → Environment Variables**, then redeploy. E
 
 The **Settings** page shows a live connection status for each integration and the exact steps for anything not yet configured — you never have to read this file again to operate the system.
 
-### 4. Scanning
+### 4. Scanning cadence
 
-`vercel.json` registers a cron job that hits `/api/scan` **every 15 minutes**. You can also press **Scan now** on the Command Center at any time.
+`vercel.json` ships a **daily** cron (`0 6 * * *`) because that is the finest granularity the **Vercel Hobby plan accepts** — a sub-daily schedule makes Vercel reject the deployment outright, before the build even starts.
+
+A scanner that runs once a day is not much of a scanner, so pick one of these:
+
+| Option | Cadence | Cost | How |
+|---|---|---|---|
+| **Scan now button** | On demand | Free | Command Center → **Scan now**. Always available. |
+| **External cron** (recommended on Hobby) | Any | Free | Point [cron-job.org](https://cron-job.org) or UptimeRobot at `https://<your-app>.vercel.app/api/scan` every 15 minutes. If you set `CRON_SECRET`, add the header `Authorization: Bearer <secret>`. |
+| **Vercel Pro** | Any | Paid | Change the schedule in `vercel.json` to `*/15 * * * *` and redeploy. |
 
 ---
 
