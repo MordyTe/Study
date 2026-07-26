@@ -1,23 +1,22 @@
-# Secrets — never commit
-.env
-
-# Databases (root data/ only — a bare "data/" would also ignore agent/data/)
-*.db
-*.db-wal
-*.db-shm
-/data/
-
-# Python
-__pycache__/
-*.pyc
-.venv/
-venv/
-*.egg-info/
-.pytest_cache/
+node_modules/
+.next/
+out/
 build/
 dist/
+.vercel
+*.tsbuildinfo
+next-env.d.ts
 
-# OS / editors
+# secrets — never commit
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# caches / artifacts
+.cache/
+data-cache/
+artifacts/screenshots/
+coverage/
+*.log
 .DS_Store
-.idea/
-.vscode/
