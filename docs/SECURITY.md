@@ -55,7 +55,7 @@ It would require a separate repository and an approved architecture decision. No
 | **Database privilege misuse** | The server writes with the service-role key. Row Level Security is enabled on every table. Anonymous clients get read-only access to analysis output; `alert_deliveries` has no public select policy at all. |
 | **Cross-user data exposure** | The schema stores no personal data, no credentials, and no account identifiers — only market analysis. |
 | **Malicious content in symbol names** | All Telegram output passes through `escapeMarkdown()`, which escapes the full MarkdownV2 reserved set. React escapes UI output by default. |
-| **Supply chain** | Dependencies are pinned in `package-lock.json`. The runtime dependency set is deliberately small: Next, React, Zod, Supabase client, lightweight-charts, recharts. |
+| **Supply chain** | Dependencies are pinned in `package-lock.json`. The runtime dependency set is deliberately small: Next, React, Zod, Supabase client, lightweight-charts, recharts. See *Dependency advisories* below for the current audit position. |
 
 ## HTTP headers
 
@@ -64,3 +64,28 @@ It would require a separate repository and an approved architecture decision. No
 ## Reporting
 
 If you find a way to make this application place a trade, that is a critical bug. Open an issue immediately with the reproduction, and treat any deployment as compromised until it is fixed.
+
+## Dependency advisories
+
+Current position as of 2026-07-25, from `npm audit --omit=dev`.
+
+### Resolved
+
+| Package | Advisory | Action taken |
+|---|---|---|
+| `next` | CVE-2025-66478 | Upgraded 15.5.4 → **15.5.22**, the patched release on the 15.x line. |
+| `sharp` | libvips CVE-2026-33327 / 33328 / 35590 / 35591 | Pinned to `^0.35.3` via an npm `overrides` entry, because Next depends on an older range transitively. |
+
+### Open, with no upstream fix available
+
+| Package | Advisory | Assessment |
+|---|---|---|
+| `postcss` | XSS via unescaped `</style>` in stringify output; arbitrary file read and path traversal via attacker-controlled `sourceMappingURL` in CSS comments | **8.5.23 is the latest published version** — no patched release exists yet. It reaches this project only as a transitive build-time dependency of Next.js. |
+
+**Why the `postcss` advisories do not translate into risk here.** All three require attacker-controlled CSS to be processed. This application compiles exactly one stylesheet, `src/app/globals.css`, which is authored in-repo and fixed at build time. No CSS is uploaded, fetched, user-supplied, or generated from external input at any point, and PostCSS never runs at request time — only during `next build`. There is no path by which a third party can introduce CSS into the pipeline.
+
+`npm audit fix --force` proposes downgrading to `next@9.3.3` to clear these. That is npm's naive resolver reaching for any version whose lockfile lacks the advisory; it would discard six major versions of Next.js, break the entire application, and reintroduce years of genuinely exploitable issues. It must not be run.
+
+Upgrading to Next 16.2.12 was tested and resolves none of these — the same transitive versions are pulled — so it offers no security benefit to weigh against a major-version migration.
+
+**Re-check when** a patched `postcss` is published; the override block in `package.json` is where any pin belongs.
