@@ -11,6 +11,7 @@
  */
 
 import type { Candidate } from '@/lib/engine/assess';
+import type { ResolutionRecord } from '@/lib/paper/calibration';
 
 export interface Settings {
   bankrollUsd: number;
@@ -75,17 +76,27 @@ export interface Store {
   recordScan(scan: ScanRecord): Promise<void>;
   listScans(limit?: number): Promise<ScanRecord[]>;
   lastScan(): Promise<ScanRecord | null>;
+
+  /**
+   * The resolution journal — what actually happened. This is the ground truth
+   * calibration is measured against, which makes it the one dataset whose loss
+   * costs months: candidates can be regenerated, resolutions cannot.
+   */
+  recordResolution(resolution: ResolutionRecord): Promise<void>;
+  listResolutions(): Promise<ResolutionRecord[]>;
 }
 
 // ---------------------------------------------------------------------------
 
 const MAX_CANDIDATES = 500;
 const MAX_SCANS = 100;
+const MAX_RESOLUTIONS = 2000;
 
 interface MemoryState {
   settings: Settings;
   candidates: Map<string, Candidate>;
   scans: ScanRecord[];
+  resolutions: Map<string, ResolutionRecord>;
 }
 
 /**
@@ -101,6 +112,7 @@ function memoryState(): MemoryState {
       settings: { ...DEFAULT_SETTINGS },
       candidates: new Map<string, Candidate>(),
       scans: [],
+      resolutions: new Map<string, ResolutionRecord>(),
     } satisfies MemoryState;
   }
   return g[GLOBAL_KEY] as MemoryState;
@@ -157,6 +169,19 @@ export class MemoryStore implements Store {
 
   async lastScan(): Promise<ScanRecord | null> {
     return memoryState().scans[0] ?? null;
+  }
+
+  async recordResolution(resolution: ResolutionRecord): Promise<void> {
+    const state = memoryState();
+    state.resolutions.set(resolution.marketId, resolution);
+    if (state.resolutions.size > MAX_RESOLUTIONS) {
+      const oldestKey = state.resolutions.keys().next().value;
+      if (oldestKey !== undefined) state.resolutions.delete(oldestKey);
+    }
+  }
+
+  async listResolutions(): Promise<ResolutionRecord[]> {
+    return [...memoryState().resolutions.values()];
   }
 }
 

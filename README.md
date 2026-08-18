@@ -109,24 +109,45 @@ it is never silently presented as persistence.
 
 | Variable | Effect when set |
 |---|---|
-| `ANTHROPIC_API_KEY` | Enables the agent tier. Without it every market abstains. |
+| `FRED_API_KEY` | Enables the statistical engine's data source. Free at fred.stlouisfed.org. |
+| `ANTHROPIC_API_KEY` | Enables live agent extraction. Optional — see the subscription workflow below. |
 | `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Durable storage. Required before calibration means anything. |
-| `RECORD_LLM=1` | Records agent responses as fixtures for replay. |
+| `RECORD_LLM=1` | Records live agent responses as fixtures for replay. |
 | `FORCE_LLM_REPLAY=1` | Serves fixtures instead of calling the API. What CI uses. |
 
 Apply `supabase/migrations/0001_init.sql` to enable durable storage.
 
+### Running the agent tier on a Claude subscription instead of an API key
+
+The extraction agents are single-shot, schema-constrained calls on purpose: it makes them
+**replayable**, and replayability means the LLM does not have to be an API at all. A Claude
+session (Claude Code on a Max plan, for instance) can *be* the agent tier:
+
+1. `npm run scan` — markets missing a parser extraction are listed with their exact cache keys.
+2. The session performs each extraction itself and records it, validated against the very schema
+   the production agent uses — an invalid payload cannot be written:
+   ```bash
+   npm run record-fixture -- resolution-parser 'resolution-parser:v1:<conditionId>' payload.json
+   ```
+3. `npm run scan` again — fixtures replay automatically, and the deterministic tiers do the rest.
+
+Only the parser and two fallback agents involve a model at all. The point estimate and the
+residual distribution come from FRED arithmetic, so a scan's *numbers* never depend on who or
+what performed the extraction.
+
 ### Network access
 
-The venue and data sources must be reachable:
+The venue and the data source must be reachable. v1 needs exactly four hosts:
 
 ```
-gamma-api.polymarket.com   clob.polymarket.com   data-api.polymarket.com
-api.stlouisfed.org   api.bls.gov   www.clevelandfed.org   api.weather.gov
+gamma-api.polymarket.com   clob.polymarket.com          (market universe + books)
+api.stlouisfed.org                                      (FRED — the statistical engine)
+data-api.polymarket.com                                 (resolution outcomes, later)
 ```
 
 `npm run verify-live` reports precisely which of these is unreachable and stops rather than
-guessing.
+guessing. In a Claude Code cloud environment these are allowed under the environment's network
+policy at claude.ai/code → the environment's settings → network access.
 
 ---
 

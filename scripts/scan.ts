@@ -52,6 +52,28 @@ async function main(): Promise<void> {
     }
   }
 
+  // Surface the extractions a Claude session should perform and record, so the
+  // subscription-driven workflow is a checklist rather than an archaeology dig.
+  // A market that abstained for want of a resolution spec is exactly a market
+  // whose parser fixture is missing, and its cache key is deterministic.
+  const needingParse = abstained.filter((c) =>
+    c.abstentionReasons.some((r) => r.includes('resolution spec')),
+  );
+  if (record.llmProviderKind !== 'anthropic' && needingParse.length > 0) {
+    console.log(
+      `\n${needingParse.length} market(s) are waiting on a resolution-parser extraction.\n` +
+        'To act as the agent tier from a Claude session, perform each extraction and record it:\n',
+    );
+    for (const c of needingParse.slice(0, 10)) {
+      console.log(`  ${c.question}`);
+      console.log(
+        `    npm run record-fixture -- resolution-parser 'resolution-parser:v1:${c.marketId}' -\n`,
+      );
+    }
+    if (needingParse.length > 10) console.log(`  …and ${needingParse.length - 10} more.\n`);
+    console.log('Then re-run the scan; fixtures replay automatically.');
+  }
+
   console.log('');
 }
 

@@ -1,0 +1,17 @@
+{
+  "cacheKey": "resolution-parser:v1:0xdemo-cpi",
+  "response": {
+    "metric": "CPI year-over-year, all items, not seasonally adjusted",
+    "agency": "BLS",
+    "seriesHint": "CPIAUCNS",
+    "releaseAtIso": "2026-09-11T12:30:00Z",
+    "threshold": 3,
+    "comparator": "gt",
+    "rounding": {
+      "decimals": 1,
+      "mode": "half-up"
+    },
+    "confidence": 0.95,
+    "unresolvedAmbiguities": []
+  }
+}

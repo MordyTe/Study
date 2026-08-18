@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run test",
     "verify-live": "tsx scripts/verify-live.ts",
-    "scan": "tsx scripts/scan.ts"
+    "scan": "tsx scripts/scan.ts",
+    "record-fixture": "tsx scripts/record-fixture.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

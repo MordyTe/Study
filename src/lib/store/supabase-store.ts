@@ -9,6 +9,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Candidate } from '@/lib/engine/assess';
+import type { ResolutionRecord } from '@/lib/paper/calibration';
 import { DEFAULT_SETTINGS, type ScanRecord, type Settings, type Store } from './index';
 
 const SETTINGS_ROW_ID = 'singleton';
@@ -116,5 +117,25 @@ export class SupabaseStore implements Store {
   async lastScan(): Promise<ScanRecord | null> {
     const scans = await this.listScans(1);
     return scans[0] ?? null;
+  }
+
+  async recordResolution(resolution: ResolutionRecord): Promise<void> {
+    await this.client.from('resolutions').upsert({
+      market_id: resolution.marketId,
+      resolved_yes: resolution.resolvedYes,
+      resolved_at: resolution.resolvedAt,
+    });
+  }
+
+  async listResolutions(): Promise<ResolutionRecord[]> {
+    const { data, error } = await this.client
+      .from('resolutions')
+      .select('market_id, resolved_yes, resolved_at');
+    if (error || !data) return [];
+    return data.map((row) => ({
+      marketId: row.market_id as string,
+      resolvedYes: Boolean(row.resolved_yes),
+      resolvedAt: Number(row.resolved_at),
+    }));
   }
 }

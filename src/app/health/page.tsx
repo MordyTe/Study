@@ -1,17 +1,21 @@
 import { Badge, Card, Stat } from '@/components/ui';
 import { getLlmProvider } from '@/lib/agents/llm';
 import { listAdapterStats } from '@/lib/net/client';
+import { MIN_CALIBRATION_SAMPLE, computeCalibration } from '@/lib/paper/calibration';
 import { getStore } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HealthPage() {
   const store = await getStore();
-  const [scans, candidates] = await Promise.all([store.listScans(10), store.listCandidates(500)]);
+  const [scans, candidates, resolutions] = await Promise.all([
+    store.listScans(10),
+    store.listCandidates(500),
+    store.listResolutions(),
+  ]);
   const llm = getLlmProvider();
   const adapters = listAdapterStats();
-
-  const resolved = 0; // Populated once markets this system estimated have settled.
+  const calibration = computeCalibration(candidates, resolutions);
 
   return (
     <main className="space-y-6">
@@ -47,31 +51,68 @@ export default async function HealthPage() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium">Calibration</h2>
+        <h2 className="text-sm font-medium">
+          Calibration — {calibration.minSampleMet ? 'measurable' : 'insufficient sample'}
+        </h2>
         <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-          No probability from this system should be trusted until all five of these hold. Until
-          then the numbers on the candidates page are a hypothesis, not a measurement.
+          {calibration.detail}
         </p>
-        <ul className="mt-4 space-y-2 text-sm">
-          {[
-            [`Resolved outcomes recorded`, `${resolved} — need hundreds`],
-            ['Calibration model fitted', 'not yet'],
-            ['Out-of-sample time-split evaluation', 'not yet'],
-            ['Brier score and reliability curve reported', 'not yet'],
-            ['Minimum sample size stated', 'yes — nothing is shown below it'],
-          ].map(([label, state]) => (
-            <li key={label} className="flex justify-between gap-4">
-              <span>{label}</span>
-              <span className="tabular text-right" style={{ color: 'var(--muted)' }}>
-                {state}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-4 grid grid-cols-2 gap-5 sm:grid-cols-4">
+          <Stat
+            label="Resolved estimates"
+            value={String(calibration.n)}
+            detail={`minimum ${MIN_CALIBRATION_SAMPLE}`}
+          />
+          <Stat
+            label="Brier — ours"
+            value={calibration.brierOurs === null ? '—' : calibration.brierOurs.toFixed(4)}
+            detail="lower is better"
+          />
+          <Stat
+            label="Brier — market"
+            value={calibration.brierMarket === null ? '—' : calibration.brierMarket.toFixed(4)}
+            detail="the bar to clear"
+          />
+          <Stat
+            label="Paper P&L"
+            value={`$${calibration.totalPnl.toFixed(2)}`}
+            detail={`on $${calibration.totalStaked.toFixed(2)} staked`}
+          />
+        </div>
+        {calibration.buckets.length > 0 ? (
+          <div className="mt-5 overflow-x-auto">
+            <table className="tabular w-full min-w-sm text-sm">
+              <thead>
+                <tr style={{ color: 'var(--muted)' }} className="text-left text-xs">
+                  <th className="pb-2 pr-4 font-normal">Forecast bucket</th>
+                  <th className="pb-2 pr-4 font-normal">Markets</th>
+                  <th className="pb-2 pr-4 font-normal">Mean forecast</th>
+                  <th className="pb-2 font-normal">Actual frequency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calibration.buckets.map((bucket) => (
+                  <tr
+                    key={bucket.lo}
+                    className="border-t"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <td className="py-1.5 pr-4">
+                      {(bucket.lo * 100).toFixed(0)}–{(bucket.hi * 100).toFixed(0)}%
+                    </td>
+                    <td className="py-1.5 pr-4">{bucket.count}</td>
+                    <td className="py-1.5 pr-4">{(bucket.meanForecast * 100).toFixed(1)}%</td>
+                    <td className="py-1.5">{(bucket.frequency * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
         <p className="mt-4 text-sm leading-relaxed">
-          Estimates produced so far: <strong>{candidates.length}</strong>. A probability displayed
-          before these preconditions are met would be a fabricated number wearing the costume of a
-          measurement.
+          Estimates produced so far: <strong>{candidates.length}</strong>. Until the minimum sample
+          is met, a displayed probability is a hypothesis wearing the costume of a measurement —
+          and the candidates page says so.
         </p>
       </Card>
 

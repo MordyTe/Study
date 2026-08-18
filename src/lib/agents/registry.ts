@@ -20,14 +20,19 @@
  *      outcome, so a bundle explains how it was assembled.
  */
 
+import { contextScanner } from './context-scanner';
 import { resolutionParser } from './resolution-parser';
+import { seriesNowcast } from './series-nowcast';
+import { sourceLocator } from './source-locator';
 import type { Agent, AgentContext, AgentRun, Claim, EvidenceBundle } from './types';
 
 /**
  * The production agent list. Order is meaningful: later agents see what earlier
- * ones produced, and the resolution spec gates everything downstream of it.
+ * ones produced. The parser gates everything; the locator turns its metric into
+ * a series; the nowcast turns the series into an estimate and a residual
+ * record; the scanner gets the last word because it can only ever veto.
  */
-export const AGENTS: Agent[] = [resolutionParser];
+export const AGENTS: Agent[] = [resolutionParser, sourceLocator, seriesNowcast, contextScanner];
 
 export const AGENT_BY_NAME = new Map(AGENTS.map((a) => [a.name, a]));
 

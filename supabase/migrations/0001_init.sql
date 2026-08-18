@@ -39,3 +39,12 @@ create table if not exists scans (
 );
 
 create index if not exists scans_started_at_idx on scans (started_at desc);
+
+-- Ground truth: what each market actually resolved to. Candidates can be
+-- regenerated from a scan; this table cannot, which makes it the one dataset
+-- whose durability actually matters for calibration.
+create table if not exists resolutions (
+  market_id    text primary key,
+  resolved_yes boolean not null,
+  resolved_at  bigint not null
+);
