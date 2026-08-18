@@ -2,21 +2,9 @@ node_modules/
 .next/
 out/
 build/
-dist/
-.vercel
-*.tsbuildinfo
-next-env.d.ts
-
-# secrets — never commit
 .env
 .env.local
-.env.*.local
-!.env.example
-
-# caches / artifacts
-.cache/
-data-cache/
-artifacts/screenshots/
-coverage/
-*.log
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
 .DS_Store

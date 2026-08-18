@@ -1,0 +1,40 @@
+{
+  "name": "scheduled-data-edge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Research-only agent network for scheduled-data prediction markets. Estimates probabilities from public sources and historical forecast error. Cannot place orders.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run test",
+    "verify-live": "tsx scripts/verify-live.ts",
+    "scan": "tsx scripts/scan.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
+    "@supabase/supabase-js": "^2.112.3",
+    "clsx": "^2.1.1",
+    "next": "16.3.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.18.6",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
