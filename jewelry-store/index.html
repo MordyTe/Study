@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--ARTIFACT:BEGIN-->
+<title>סטודיו נוגה</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap" rel="stylesheet">
+<style id="site-style">
+:root{
+  --ink:#0E1E18; --ink-2:#122822;
+  --panel:#152E26; --panel-2:#1A382E;
+  --line:#25453A; --line-gold:rgba(198,161,91,.38);
+  --gold:#C6A15B; --gold-2:#E9D4A0; --gold-dim:#8F7440;
+  --ivory:#F3ECDC; --mist:#A6BAAE; --mist-2:#7E948A;
+  --danger:#E09A9A; --ok:#8FD0AE;
+  --serif:"Frank Ruhl Libre","Times New Roman",serif;
+  --sans:"Assistant","Segoe UI",Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; font-family:var(--sans); font-size:16px; line-height:1.6;
+  color:var(--ivory); background:var(--ink);
+  background-image:radial-gradient(1100px 520px at 50% -120px, #1A3A2F 0%, var(--ink) 62%);
+}
+img{max-width:100%} [hidden]{display:none!important}
+::selection{background:var(--gold); color:#171106}
+:focus-visible{outline:2px solid var(--gold-2); outline-offset:2px; border-radius:4px}
+a{color:var(--gold-2)}
+h1,h2,h3{text-wrap:balance}
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:18px;
+  padding:12px clamp(16px,4vw,40px); backdrop-filter:blur(10px);
+  background:rgba(11,22,18,.82); border-bottom:1px solid var(--line);
+}
+.topbar .brand{font-family:var(--serif); font-size:20px; color:var(--gold-2); letter-spacing:.02em; text-decoration:none}
+.topnav{display:flex; gap:20px; margin-inline-start:auto}
+.topnav a{color:var(--mist); text-decoration:none; font-size:15px}
+.topnav a:hover{color:var(--gold-2)}
+.editbtn{
+  display:flex; align-items:center; gap:7px; font:600 14px var(--sans);
+  color:var(--gold); background:none; border:1px solid var(--gold-dim); border-radius:999px;
+  padding:7px 14px; cursor:pointer; transition:all .2s;
+}
+.editbtn:hover{border-color:var(--gold); color:var(--gold-2)}
+.editbtn.on{background:var(--gold); color:#1A1206; border-color:var(--gold)}
+.editbtn svg{width:14px;height:14px;fill:currentColor}
+
+/* ---------- hero ---------- */
+.hero{padding:clamp(48px,8vw,88px) 20px 26px; text-align:center}
+.hero .emblem{width:76px; height:76px; margin-bottom:10px}
+.hero h1{
+  font-family:var(--serif); font-weight:500; margin:0;
+  font-size:clamp(40px,7.5vw,72px); line-height:1.15; color:var(--ivory);
+}
+.hero .tagline{max-width:52ch; margin:14px auto 0; color:var(--mist); font-size:clamp(16px,2.2vw,19px); font-weight:300}
+.divider{display:flex; align-items:center; justify-content:center; gap:12px; margin:26px auto 0; color:var(--gold)}
+.divider::before,.divider::after{content:""; width:min(120px,22vw); height:1px;
+  background:linear-gradient(to var(--dir,left), var(--gold-dim), transparent)}
+.divider::after{--dir:right}
+.divider .gem{width:9px;height:9px;transform:rotate(45deg);border:1px solid var(--gold);background:rgba(198,161,91,.25)}
+
+/* ---------- chips ---------- */
+.chips{display:flex; flex-wrap:wrap; justify-content:center; gap:10px; padding:22px 16px 8px}
+.chip{
+  font:600 14px var(--sans); color:var(--mist); background:none; cursor:pointer;
+  border:1px solid var(--line); border-radius:999px; padding:8px 18px; transition:all .2s;
+}
+.chip:hover{border-color:var(--line-gold); color:var(--gold-2)}
+.chip.on{background:var(--gold); border-color:var(--gold); color:#1A1206}
+
+/* ---------- gallery ---------- */
+.gallery{max-width:1180px; margin:26px auto 10px; padding:0 clamp(14px,3vw,28px);
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:22px}
+.card{
+  position:relative; text-align:right; background:linear-gradient(170deg,var(--panel-2),var(--panel) 55%);
+  border:1px solid var(--line); border-radius:16px; overflow:hidden; cursor:pointer;
+  transition:transform .35s ease, border-color .35s, box-shadow .35s;
+  animation:rise .6s both;
+}
+.card:hover{transform:translateY(-4px); border-color:var(--line-gold); box-shadow:0 20px 44px rgba(0,0,0,.4)}
+.card-art{aspect-ratio:1/1; display:block; background:#0C1913}
+.card-art svg,.card-art img{width:100%; height:100%; display:block; object-fit:cover}
+.card-info{padding:14px 18px 17px}
+.card-info h3{margin:0; font:500 20px var(--serif); color:var(--ivory)}
+.card-info .mat{margin:3px 0 10px; font-size:13.5px; color:var(--mist-2)}
+.card-row{display:flex; align-items:baseline; justify-content:space-between}
+.price{font:500 19px var(--serif); color:var(--gold-2); font-variant-numeric:tabular-nums}
+.cta{font-size:13px; color:var(--mist-2); opacity:0; transform:translateX(6px); transition:all .3s}
+.card:hover .cta{opacity:1; transform:none; color:var(--gold)}
+.card-editbadge{
+  position:absolute; top:10px; inset-inline-start:10px; z-index:2;
+  font:600 12.5px var(--sans); color:var(--gold-2);
+  background:rgba(10,20,16,.85); border:1px solid var(--gold-dim); border-radius:999px; padding:4px 12px;
+}
+.card.addtile{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  min-height:280px; background:none; border:1.5px dashed var(--gold-dim); color:var(--gold);
+}
+.card.addtile:hover{border-color:var(--gold); box-shadow:none}
+.card.addtile .plus{font:300 52px var(--serif); line-height:1}
+.card.addtile span{font:600 15px var(--sans)}
+.empty-note{grid-column:1/-1; text-align:center; color:var(--mist-2); padding:40px 0}
+
+/* ---------- sections ---------- */
+.section{max-width:760px; margin:64px auto 0; padding:0 22px; text-align:center}
+.section h2{font:500 30px var(--serif); color:var(--ivory); margin:0 0 14px}
+.section p{color:var(--mist); font-size:17px; white-space:pre-line; margin:0}
+footer{
+  margin-top:72px; padding:34px 22px 44px; border-top:1px solid var(--line);
+  text-align:center; color:var(--mist);
+}
+.contact-row{display:flex; flex-wrap:wrap; justify-content:center; gap:8px 28px; margin-bottom:14px; font-size:15.5px}
+.contact-row .lbl{color:var(--gold); font-weight:600; margin-inline-end:6px; font-size:13.5px; letter-spacing:.04em}
+.footnote{font-size:13.5px; color:var(--mist-2)}
+
+/* ---------- overlay / dialogs ---------- */
+.scrim{
+  position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+  background:rgba(5,11,9,.72); backdrop-filter:blur(4px); padding:18px; animation:fade .25s both;
+}
+.dialog{
+  position:relative; width:min(880px,96vw); max-height:92vh; overflow:auto;
+  background:linear-gradient(165deg,#16332A,#10241D 60%);
+  border:1px solid var(--line-gold); border-radius:20px;
+  box-shadow:0 30px 80px rgba(0,0,0,.55); animation:pop .3s both;
+}
+.dialog .x{
+  position:absolute; top:12px; inset-inline-end:12px; z-index:3; width:36px; height:36px;
+  border-radius:50%; border:1px solid var(--line); background:rgba(10,20,16,.7);
+  color:var(--mist); font-size:19px; line-height:1; cursor:pointer;
+}
+.dialog .x:hover{color:var(--ivory); border-color:var(--line-gold)}
+.p-grid{display:grid; grid-template-columns:1fr 1.1fr}
+.p-art{background:#0C1913; min-height:300px}
+.p-art svg,.p-art img{width:100%; height:100%; object-fit:cover; display:block}
+.p-body{padding:26px 28px 30px}
+.p-kicker{font:600 13px var(--sans); color:var(--gold); letter-spacing:.14em; margin:0 0 4px}
+.p-body h2{font:500 32px var(--serif); margin:0; color:var(--ivory)}
+.p-body .mat{color:var(--mist-2); margin:4px 0 12px; font-size:14.5px}
+.p-body .desc{color:var(--mist); margin:0 0 16px; max-width:56ch}
+.price-line{display:flex; align-items:baseline; gap:10px; border-block:1px solid var(--line); padding:12px 0; margin-bottom:16px}
+.price-line .price{font-size:26px}
+.price-line .unit{font-size:13px; color:var(--mist-2)}
+.orderform h3{font:500 20px var(--serif); color:var(--gold-2); margin:0 0 10px}
+.fld{margin-bottom:12px}
+.fld label{display:block; font:600 13px var(--sans); color:var(--gold); letter-spacing:.05em; margin-bottom:5px}
+.fld input,.fld select,.fld textarea{
+  width:100%; font:400 15.5px var(--sans); color:var(--ivory);
+  background:#0B1A14; border:1px solid var(--line); border-radius:10px; padding:10px 13px;
+}
+.fld textarea{min-height:70px; resize:vertical}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px rgba(198,161,91,.18)}
+.fld .err{display:none; color:var(--danger); font-size:13px; margin-top:4px}
+.fld.bad input{border-color:var(--danger)}
+.fld.bad .err{display:block}
+.two{display:grid; grid-template-columns:1fr 110px; gap:12px}
+.btn{
+  font:600 15.5px var(--sans); cursor:pointer; border-radius:11px; padding:11px 22px;
+  border:1px solid var(--gold); color:#1A1206;
+  background:linear-gradient(180deg,var(--gold-2),var(--gold)); transition:filter .2s;
+}
+.btn:hover{filter:brightness(1.07)}
+.btn:disabled{opacity:.45; cursor:default; filter:none}
+.btn-ghost{background:none; border:1px solid var(--gold-dim); color:var(--gold)}
+.btn-ghost:hover{border-color:var(--gold); color:var(--gold-2); filter:none}
+.btn-danger{background:none; border:1px solid var(--danger); color:var(--danger)}
+.fine{font-size:13px; color:var(--mist-2); margin:12px 0 0}
+.success{padding:8px 0 4px}
+.success .ok-ring{
+  width:54px; height:54px; border-radius:50%; border:1.5px solid var(--gold);
+  display:flex; align-items:center; justify-content:center; font-size:24px; color:var(--gold-2); margin-bottom:12px;
+}
+.success h3{font:500 24px var(--serif); color:var(--ivory); margin:0 0 6px}
+.success p{color:var(--mist); margin:0 0 8px}
+.success .num{color:var(--gold-2); font-variant-numeric:tabular-nums}
+
+/* ---------- editor dialog ---------- */
+.editor{padding:26px 28px 30px}
+.editor h2{font:500 26px var(--serif); color:var(--ivory); margin:0 0 18px}
+.ed-grid{display:grid; grid-template-columns:220px 1fr; gap:22px}
+.ed-preview{border:1px solid var(--line); border-radius:14px; overflow:hidden; background:#0C1913; align-self:start}
+.ed-preview svg,.ed-preview img{width:100%; aspect-ratio:1/1; object-fit:cover; display:block}
+.ed-imgbtns{display:flex; flex-direction:column; gap:8px; margin-top:10px}
+.ed-actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; align-items:center}
+.ed-actions .spacer{flex:1}
+
+/* ---------- orders drawer ---------- */
+.orders{padding:26px 28px 30px}
+.orders h2{font:500 26px var(--serif); color:var(--ivory); margin:0 0 6px}
+.orders .src{color:var(--mist-2); font-size:13.5px; margin:0 0 16px}
+.order-row{
+  display:grid; grid-template-columns:1fr auto; gap:4px 14px; align-items:center;
+  border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:10px; background:rgba(11,25,19,.5);
+}
+.order-row .head{font-weight:600; color:var(--ivory)}
+.order-row .head .price{font-size:15px; margin-inline-start:8px}
+.order-row .meta{grid-column:1/-1; color:var(--mist); font-size:14px}
+.order-row .meta .note{color:var(--mist-2)}
+.order-row .when{color:var(--mist-2); font-size:12.5px; grid-column:1/-1}
+.order-row .del{justify-self:end; grid-row:1; grid-column:2}
+.mini{font:600 13px var(--sans); padding:5px 12px; border-radius:8px; cursor:pointer}
+
+/* ---------- edit mode ---------- */
+body.editing [data-edit]{cursor:text; outline:1.5px dashed var(--line-gold); outline-offset:5px; border-radius:4px; min-width:24px}
+body.editing [data-edit]:focus{outline:1.5px solid var(--gold)}
+body.editing [data-edit]:empty::before{content:"לחצו לעריכה"; color:var(--mist-2)}
+.savebar{
+  position:fixed; bottom:16px; right:50%; transform:translateX(50%); z-index:70;
+  display:none; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;
+  max-width:min(96vw,760px); padding:10px 16px; border-radius:16px;
+  background:rgba(9,19,15,.94); border:1px solid var(--gold-dim); box-shadow:0 16px 50px rgba(0,0,0,.5);
+}
+body.editing .savebar{display:flex}
+.savebar .msg{font-size:14px; color:var(--mist); padding-inline-end:4px}
+.savebar .msg b{color:var(--gold-2); font-weight:600}
+.toast{
+  position:fixed; bottom:86px; right:50%; transform:translateX(50%) translateY(8px); z-index:80;
+  background:#0B1A14; border:1px solid var(--gold-dim); color:var(--ivory);
+  border-radius:12px; padding:11px 20px; font-size:14.5px; opacity:0; pointer-events:none;
+  transition:opacity .3s, transform .3s; max-width:92vw; text-align:center;
+}
+.toast.show{opacity:1; transform:translateX(50%) translateY(0)}
+
+@keyframes rise{from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none}}
+@keyframes fade{from{opacity:0} to{opacity:1}}
+@keyframes pop{from{opacity:0; transform:scale(.97) translateY(8px)} to{opacity:1; transform:none}}
+@media (max-width:720px){
+  .topnav{display:none}
+  .p-grid{grid-template-columns:1fr}
+  .p-art{max-height:320px}
+  .ed-grid{grid-template-columns:1fr}
+  .ed-preview{max-width:240px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important; transition:none!important}
+  html{scroll-behavior:auto}
+}
+</style>
+<!--ARTIFACT:SPLIT-->
+</head>
+<body>
+<!--ARTIFACT:RESUME-->
+<div id="app"></div>
+<div id="overlay"></div>
+<script type="application/json" id="site-data">
+{
+  "brand": {
+    "name": "סטודיו נוגה",
+    "tagline": "תכשיטים בעבודת יד — סדרות קטנות של זהב, כסף ואבני חן, מהסטודיו ואליך.",
+    "about": "בסטודיו נוגה כל תכשיט מתחיל בסקיצה על נייר ונגמר בכלי מלוטש ביד. אנחנו עובדים בסדרות קטנות: זהב 14K, כסף 925 ואבני חן שנבחרות אחת־אחת.\nהזמנה מהאתר היא תחילת שיחה — נחזור אליך לתיאום מידה, גימור ומשלוח.",
+    "phone": "050-123-4567",
+    "email": "hello@nogah.example",
+    "instagram": "@nogah.studio",
+    "orderNote": "נחזור אליך עד יום עסקים אחד לאישור ההזמנה ולתיאום תשלום, מידה ומשלוח.",
+    "footNote": "סטודיו נוגה · אתר הדגמה. המחירים בשקלים חדשים וכוללים מע״מ; משלוח מתואם בנפרד."
+  },
+  "products": [
+    { "id": "p1", "name": "אור ראשון", "cat": "rings", "price": 1480, "material": "זהב 14K · ברקת", "desc": "טבעת חישוק עדינה בזהב 14K, עם ברקת בליטוש משושה שנקבעת ביד. הירוק העמוק של האבן תופס את האור בכל תנועה — טבעת יומיומית שמרגישה חגיגית.", "art": { "metal": "gold", "stone": "emerald" }, "img": null },
+    { "id": "p2", "name": "ליל ירח", "cat": "rings", "price": 620, "material": "כסף 925 · פנינה", "desc": "חישוק כסף מוברש שנסגר סביב פנינת מים מתוקים אפורה־לבנה. עדינה מספיק ליומיום, יפה מספיק כדי שישאלו עליה.", "art": { "metal": "silver", "stone": "pearl" }, "img": null },
+    { "id": "p3", "name": "טיפת שמש", "cat": "necklaces", "price": 980, "material": "גולדפילד · סיטרין", "desc": "שרשרת חוליות דקה ותליון סיטרין בליטוש טיפה. צהוב־דבש חם שמאיר את קו הצוואר, עם סוגר שמאפשר שלושה אורכים.", "art": { "metal": "gold", "stone": "citrine" }, "img": null },
+    { "id": "p4", "name": "נהר", "cat": "necklaces", "price": 1150, "material": "כסף 925 · ספיר", "desc": "תליון ספיר כחול־לילה על שרשרת כסף בעבודת יד. ההשראה: נהר בלילה, כשהמים כהים והשמיים בפנים.", "art": { "metal": "silver", "stone": "sapphire" }, "img": null },
+    { "id": "p5", "name": "חצי סהר", "cat": "earrings", "price": 760, "material": "זהב 14K", "desc": "חישוקי זהב חלקים בקוטר 38 מ״מ, קלים להפליא בזכות חלל פנימי. הקלאסיקה שעובדת עם הכול — נמכרים כזוג.", "art": { "metal": "gold", "stone": "none" }, "img": null },
+    { "id": "p6", "name": "גשם ראשון", "cat": "earrings", "price": 540, "material": "כסף 925 · אחלמה", "desc": "עגילים נופלים עם אבן אחלמה סגולה בליטוש מרקיזה. נעים על האוזן, זזים עם הראש, תופסים אור מכל כיוון.", "art": { "metal": "silver", "stone": "amethyst" }, "img": null },
+    { "id": "p7", "name": "חוליות", "cat": "bracelets", "price": 1320, "material": "זהב אדום · רובי", "desc": "צמיד קשיח פתוח בזהב אדום, עם רובי קטן בכל קצה. נסגר בלחיצה עדינה ומתאים לרוב מידות פרק היד.", "art": { "metal": "rose", "stone": "ruby" }, "img": null },
+    { "id": "p8", "name": "גל", "cat": "bracelets", "price": 890, "material": "כסף 925 · פנינה", "desc": "צמיד פתוח בהשראת קו הגל — כסף מרוקע בפטיש עם פנינה בכל קצה. נראה טוב לבד, נהדר בשכבות.", "art": { "metal": "silver", "stone": "pearl" }, "img": null }
+  ]
+}
+</script>
+<script id="site-script">
+'use strict';
+/* ============================================================
+   סטודיו נוגה — אתר הדגמה לחנות תכשיטים.
+   קובץ יחיד: גלריה, טופס הזמנה לכל מוצר, ומצב עריכה.
+   שמירה: פרסום גרסה חדשה של הארטיפקט (claude.use("artifact")),
+   ואם אין — localStorage. הזמנות: claude.use("db") או localStorage.
+   ============================================================ */
+
+var app = document.getElementById('app');
+var overlay = document.getElementById('overlay');
+document.documentElement.setAttribute('dir','rtl');
+document.documentElement.setAttribute('lang','he');
+
+/* ---------- helpers ---------- */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function uid(){ return Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-4); }
+function fmtPrice(n){ return '₪' + Number(n||0).toLocaleString('he-IL'); }
+function hashStr(s){ var h=2166136261; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+function rng(seed){ var a=seed; return function(){ a|=0; a=(a+0x6D2B79F5)|0; var t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+
+/* ---------- constants + state ---------- */
+var LSK='nogah.site.v1', LSO='nogah.orders.v1';
+var FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+  + '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+  + '<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap" rel="stylesheet">';
+var CATS = { rings:'טבעות', necklaces:'שרשראות', earrings:'עגילים', bracelets:'צמידים' };
+var METALS = {
+  gold:  { name:'זהב',      a:'#8C6F3F', b:'#EED9A4', c:'#B5975C' },
+  silver:{ name:'כסף',      a:'#79858C', b:'#EDF2F4', c:'#A7B3BB' },
+  rose:  { name:'זהב אדום', a:'#9C6355', b:'#F0C3B0', c:'#C08A79' }
+};
+var STONES = {
+  none:    { name:'ללא אבן', c:'',        hi:'' },
+  emerald: { name:'ברקת',    c:'#2E8F6C', hi:'#8FE0BE' },
+  ruby:    { name:'רובי',    c:'#B04A5E', hi:'#EDA0AE' },
+  sapphire:{ name:'ספיר',    c:'#4A69B0', hi:'#9FB8EE' },
+  pearl:   { name:'פנינה',   c:'#E5DFD2', hi:'#FFFFFF' },
+  citrine: { name:'סיטרין',  c:'#D2A03E', hi:'#F5DC96' },
+  amethyst:{ name:'אחלמה',   c:'#8464AC', hi:'#CBB1EA' },
+  onyx:    { name:'אוניקס',  c:'#33323B', hi:'#77758A' }
+};
+
+var EMBED = JSON.parse(document.getElementById('site-data').textContent);
+function loadLocal(){ try{ var s=localStorage.getItem(LSK); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function saveLocal(){ try{ localStorage.setItem(LSK, JSON.stringify(state)); return true; }catch(e){ return false; } }
+function loadOrders(){ try{ var s=localStorage.getItem(LSO); return s?JSON.parse(s):[]; }catch(e){ return []; } }
+function saveOrders(){ try{ localStorage.setItem(LSO, JSON.stringify(localOrders)); }catch(e){} }
+
+var state = loadLocal() || clone(EMBED);
+var savedSnapshot = clone(state);
+var editMode=false, dirty=false, activeFilter='all';
+var artifactNS=null, dbNS=null, capsReady=false;
+var localOrders = loadOrders();
+var dbOrders=null, ordersUnsub=null;
+
+function markDirty(){ dirty = JSON.stringify(state)!==JSON.stringify(savedSnapshot); updateBar(); }
+
+/* ============================================================
+   איורי SVG גנרטיביים — תכשיט נוצר מקטגוריה + מתכת + אבן
+   ============================================================ */
+function artSVG(p){
+  var m = METALS[p.art && p.art.metal] || METALS.gold;
+  var st = STONES[p.art && p.art.stone] || STONES.none;
+  var id = 'g' + hashStr(p.id + (p.art?p.art.metal+p.art.stone:''));
+  var r = rng(hashStr(p.id));
+  var out = '<svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="' + esc(p.name) + '" xmlns="http://www.w3.org/2000/svg">';
+  out += '<defs>'
+    + '<radialGradient id="bg'+id+'" cx="50%" cy="30%" r="80%">'
+    +   '<stop offset="0%" stop-color="#1E4033"/><stop offset="100%" stop-color="#0B1913"/>'
+    + '</radialGradient>'
+    + '<linearGradient id="m'+id+'" x1="0" y1="0" x2="1" y2="1">'
+    +   '<stop offset="0" stop-color="'+m.a+'"/><stop offset=".45" stop-color="'+m.b+'"/>'
+    +   '<stop offset=".62" stop-color="'+m.b+'"/><stop offset="1" stop-color="'+m.c+'"/>'
+    + '</linearGradient>';
+  if(st.c){
+    out += '<radialGradient id="s'+id+'" cx="38%" cy="30%" r="80%">'
+      + '<stop offset="0" stop-color="'+st.hi+'"/><stop offset=".55" stop-color="'+st.c+'"/>'
+      + '<stop offset="1" stop-color="'+shade(st.c)+'"/></radialGradient>';
+  }
+  out += '</defs>';
+  out += '<rect width="400" height="400" fill="url(#bg'+id+')"/>';
+  if(st.c){ out += '<rect width="400" height="400" fill="'+st.c+'" opacity="0.05"/>'; }
+  out += '<ellipse cx="200" cy="352" rx="108" ry="14" fill="#000" opacity="0.3"/>';
+  var M='url(#m'+id+')', S='url(#s'+id+')';
+  var draw = { rings:ringArt, necklaces:necklaceArt, earrings:earringArt, bracelets:braceletArt }[p.cat] || ringArt;
+  out += draw(M, S, st, m);
+  for(var i=0;i<6;i++){
+    var sx=40+320*r(), sy=30+150*r(), sr=2.2+3.4*r();
+    out += '<polygon points="'+starPts(sx,sy,sr)+'" fill="'+(r()>0.5?'#FFF':'#E9D4A0')+'" opacity="'+(0.35+0.45*r()).toFixed(2)+'"/>';
+  }
+  return out + '</svg>';
+}
+function shade(hex){
+  var n=parseInt(hex.slice(1),16);
+  var rr=Math.round(((n>>16)&255)*0.45), gg=Math.round(((n>>8)&255)*0.45), bb=Math.round((n&255)*0.45);
+  return 'rgb('+rr+','+gg+','+bb+')';
+}
+function starPts(cx,cy,rr){
+  var s=rr*0.3;
+  return [cx,cy-rr, cx+s,cy-s, cx+rr,cy, cx+s,cy+s, cx,cy+rr, cx-s,cy+s, cx-rr,cy, cx-s,cy-s]
+    .map(function(v){return (+v).toFixed(1);}).join(' ');
+}
+function hexPts(cx,cy,rr,rot){
+  var a=[]; for(var i=0;i<6;i++){ var t=rot+i*Math.PI/3;
+    a.push((cx+rr*Math.cos(t)).toFixed(1), (cy+rr*Math.sin(t)).toFixed(1)); }
+  return a.join(' ');
+}
+function gemHex(cx,cy,rr,S,st){
+  var g = '<polygon points="'+hexPts(cx,cy,rr,-Math.PI/2)+'" fill="'+S+'" stroke="'+st.hi+'" stroke-width="1.2" stroke-opacity="0.6"/>';
+  g += '<polygon points="'+hexPts(cx,cy,rr*0.55,-Math.PI/2)+'" fill="'+st.hi+'" opacity="0.3"/>';
+  g += '<polygon points="'+starPts(cx-rr*0.3,cy-rr*0.35,rr*0.22)+'" fill="#FFF" opacity="0.85"/>';
+  return g;
+}
+function gemDrop(cx,cy,w,h,S,st){
+  var g = '<polygon points="'+[cx,cy-h/2, cx+w/2,cy, cx,cy+h/2, cx-w/2,cy].join(' ')+'" fill="'+S+'" stroke="'+st.hi+'" stroke-width="1.2" stroke-opacity="0.6"/>';
+  g += '<polygon points="'+[cx,cy-h*0.28, cx+w*0.28,cy, cx,cy+h*0.28, cx-w*0.28,cy].join(' ')+'" fill="'+st.hi+'" opacity="0.3"/>';
+  g += '<polygon points="'+starPts(cx-w*0.16,cy-h*0.16,4)+'" fill="#FFF" opacity="0.85"/>';
+  return g;
+}
+function ringArt(M,S,st){
+  var a = '<circle cx="200" cy="232" r="96" fill="none" stroke="'+M+'" stroke-width="17"/>';
+  a += '<circle cx="200" cy="232" r="96" fill="none" stroke="#FFF" stroke-width="3" opacity="0.3" stroke-dasharray="105 500" transform="rotate(-150 200 232)" stroke-linecap="round"/>';
+  if(st.c){
+    a += '<circle cx="178" cy="141" r="6" fill="'+M+'"/><circle cx="222" cy="141" r="6" fill="'+M+'"/>';
+    a += gemHex(200,124,31,S,st);
+  }
+  return a;
+}
+function necklaceArt(M,S,st){
+  var a='';
+  for(var i=0;i<=26;i++){
+    var u=i/26, x=58+284*u, y=74+Math.pow(Math.sin(Math.PI*u),1.12)*176;
+    a += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="4.6" fill="none" stroke="'+M+'" stroke-width="2.4"/>';
+  }
+  a += '<circle cx="200" cy="256" r="6.5" fill="none" stroke="'+M+'" stroke-width="3"/>';
+  if(st.c){ a += gemDrop(200,316,62,106,S,st); }
+  else{ a += '<circle cx="200" cy="308" r="30" fill="'+M+'"/><circle cx="192" cy="299" r="9" fill="#FFF" opacity="0.35"/>'; }
+  return a;
+}
+function earringArt(M,S,st){
+  var a='', xs=[132,268];
+  for(var i=0;i<2;i++){
+    var cx=xs[i];
+    if(st.c){
+      a += '<circle cx="'+cx+'" cy="118" r="7" fill="'+M+'"/>';
+      a += '<line x1="'+cx+'" y1="125" x2="'+cx+'" y2="166" stroke="'+M+'" stroke-width="2.6"/>';
+      a += gemDrop(cx,216,52,96,S,st);
+    }else{
+      a += '<circle cx="'+cx+'" cy="212" r="62" fill="none" stroke="'+M+'" stroke-width="11"/>';
+      a += '<circle cx="'+cx+'" cy="212" r="62" fill="none" stroke="#FFF" stroke-width="2.5" opacity="0.32" stroke-dasharray="70 320" transform="rotate(-140 '+cx+' 212)" stroke-linecap="round"/>';
+      a += '<circle cx="'+cx+'" cy="150" r="6.5" fill="'+M+'"/>';
+    }
+  }
+  return a;
+}
+function braceletArt(M,S,st,m){
+  var e1x=122.2, e2x=277.8, ey=137.2;
+  var a = '<path d="M '+e1x+' '+ey+' A 110 110 0 1 0 '+e2x+' '+ey+'" fill="none" stroke="'+M+'" stroke-width="15" stroke-linecap="round"/>';
+  a += '<path d="M 132 155 A 96 96 0 1 0 268 155" fill="none" stroke="#FFF" stroke-width="2.5" opacity="0.25"/>';
+  a += '<circle cx="'+e1x+'" cy="'+ey+'" r="11" fill="'+M+'"/><circle cx="'+e2x+'" cy="'+ey+'" r="11" fill="'+M+'"/>';
+  if(st.c){
+    a += '<circle cx="'+e1x+'" cy="'+ey+'" r="6.5" fill="'+S+'" stroke="'+st.hi+'" stroke-opacity="0.6"/>';
+    a += '<circle cx="'+e2x+'" cy="'+ey+'" r="6.5" fill="'+S+'" stroke="'+st.hi+'" stroke-opacity="0.6"/>';
+  }
+  return a;
+}
+function artOrImg(p){
+  if(p.img){ return '<img src="'+esc(p.img)+'" alt="'+esc(p.name)+'" loading="lazy">'; }
+  return artSVG(p);
+}
+
+/* ============================================================
+   רינדור הדף
+   ============================================================ */
+var PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.2V21h3.8L17.8 9.9l-3.7-3.7L3 17.2zM20.7 7c.4-.4.4-1 0-1.4l-2.3-2.3c-.4-.4-1-.4-1.4 0l-1.8 1.8 3.7 3.7L20.7 7z"/></svg>';
+
+function editable(path, tag, cls, value){
+  var ce = editMode ? ' contenteditable="true" spellcheck="false"' : '';
+  return '<'+tag+' class="'+cls+'" data-edit="'+path+'"'+ce+'>'+esc(value)+'</'+tag+'>';
+}
+function render(){
+  var b = state.brand;
+  document.title = b.name || 'סטודיו נוגה';
+  var h = '';
+  h += '<header class="topbar">'
+    + '<a class="brand" href="#top">'+esc(b.name)+'</a>'
+    + '<nav class="topnav" aria-label="ניווט">'
+    +   '<a href="#gallery">הגלריה</a><a href="#about">על הסטודיו</a><a href="#contact">יצירת קשר</a>'
+    + '</nav>'
+    + '<button class="editbtn'+(editMode?' on':'')+'" data-act="toggle-edit">'+PENCIL+(editMode?'במצב עריכה':'עריכה')+'</button>'
+    + '</header>';
+  h += '<section class="hero" id="top">'
+    + '<svg class="emblem" viewBox="0 0 80 80" aria-hidden="true">'
+    +   '<circle cx="40" cy="46" r="24" fill="none" stroke="#C6A15B" stroke-width="2.5"/>'
+    +   '<circle cx="40" cy="46" r="24" fill="none" stroke="#E9D4A0" stroke-width="1" opacity="0.6" stroke-dasharray="30 130" stroke-linecap="round" transform="rotate(-120 40 46)"/>'
+    +   '<polygon points="40,8 47,17 40,26 33,17" fill="none" stroke="#C6A15B" stroke-width="2"/>'
+    +   '<polygon points="40,12.5 43.5,17 40,21.5 36.5,17" fill="#C6A15B" opacity="0.5"/>'
+    + '</svg>'
+    + editable('brand.name','h1','',b.name)
+    + editable('brand.tagline','p','tagline',b.tagline)
+    + '<div class="divider" aria-hidden="true"><span class="gem"></span></div>'
+    + '</section>';
+  h += '<div class="chips" id="gallery" aria-label="סינון לפי קטגוריה">';
+  h += chip('all','הכול');
+  for(var c in CATS){ h += chip(c, CATS[c]); }
+  h += '</div>';
+  h += '<main class="gallery">' + gridHTML() + '</main>';
+  h += '<section class="section" id="about"><h2>על הסטודיו</h2>' + editable('brand.about','p','',b.about) + '</section>';
+  h += '<footer id="contact">'
+    + '<div class="contact-row">'
+    +   '<span><span class="lbl">טלפון</span>'+editable('brand.phone','span','',b.phone)+'</span>'
+    +   '<span><span class="lbl">אימייל</span>'+editable('brand.email','span','',b.email)+'</span>'
+    +   '<span><span class="lbl">אינסטגרם</span>'+editable('brand.instagram','span','',b.instagram)+'</span>'
+    + '</div>'
+    + editable('brand.footNote','p','footnote',b.footNote)
+    + '</footer>';
+  app.innerHTML = h;
+  document.body.classList.toggle('editing', editMode);
+}
+function chip(cat,label){
+  return '<button class="chip'+(activeFilter===cat?' on':'')+'" data-act="filter" data-cat="'+cat+'">'+label+'</button>';
+}
+function gridHTML(){
+  var list = state.products.filter(function(p){ return activeFilter==='all'||p.cat===activeFilter; });
+  var h = list.map(function(p,i){
+    return '<article class="card" data-act="open" data-id="'+p.id+'" style="animation-delay:'+(i*60)+'ms" tabindex="0" role="button" aria-label="'+esc(p.name)+'">'
+      + (editMode?'<span class="card-editbadge">'+PENCIL.replace('<svg','<svg style="width:11px;height:11px;vertical-align:-1px;fill:currentColor"')+' עריכת מוצר</span>':'')
+      + '<div class="card-art">'+artOrImg(p)+'</div>'
+      + '<div class="card-info"><h3>'+esc(p.name)+'</h3><p class="mat">'+esc(p.material)+'</p>'
+      + '<div class="card-row"><span class="price">'+fmtPrice(p.price)+'</span><span class="cta">'+(editMode?'עריכה':'להזמנה')+' ←</span></div></div>'
+      + '</article>';
+  }).join('');
+  if(editMode){
+    h += '<button class="card addtile" data-act="add"><span class="plus">+</span><span>הוספת מוצר חדש</span></button>';
+  }
+  if(!h){ h = '<p class="empty-note">אין כרגע פריטים בקטגוריה הזו.</p>'; }
+  return h;
+}
+
+/* ============================================================
+   דיאלוג מוצר + טופס הזמנה
+   ============================================================ */
+function openProduct(p){
+  overlay.innerHTML = '<div class="scrim" data-act="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-label="'+esc(p.name)+'">'
+    + '<button class="x" data-act="close" aria-label="סגירה">×</button>'
+    + '<div class="p-grid">'
+    + '<div class="p-art">'+artOrImg(p)+'</div>'
+    + '<div class="p-body">'
+    +   '<p class="p-kicker">'+esc(CATS[p.cat]||'')+'</p>'
+    +   '<h2>'+esc(p.name)+'</h2>'
+    +   '<p class="mat">'+esc(p.material)+'</p>'
+    +   '<p class="desc">'+esc(p.desc)+'</p>'
+    +   '<div class="price-line"><span class="price">'+fmtPrice(p.price)+'</span><span class="unit">ליחידה · כולל מע״מ</span></div>'
+    +   '<form class="orderform" id="order-form" data-id="'+p.id+'" novalidate>'
+    +     '<h3>טופס הזמנה</h3>'
+    +     '<div class="fld"><label for="of-name">שם מלא</label><input id="of-name" autocomplete="name" required><p class="err">איך קוראים לך? זה שדה חובה.</p></div>'
+    +     '<div class="two">'
+    +       '<div class="fld"><label for="of-phone">טלפון</label><input id="of-phone" type="tel" autocomplete="tel" required dir="ltr" style="text-align:right"><p class="err">צריך מספר טלפון תקין כדי שנחזור אליך.</p></div>'
+    +       '<div class="fld"><label for="of-qty">כמות</label><select id="of-qty"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>'
+    +     '</div>'
+    +     '<div class="fld"><label for="of-note">מידה והערות (לא חובה)</label><textarea id="of-note" placeholder="למשל: מידה 54, אריזת מתנה"></textarea></div>'
+    +     '<button class="btn" type="submit">שליחת הזמנה</button>'
+    +     '<p class="fine">'+esc(state.brand.orderNote)+'</p>'
+    +   '</form>'
+    + '</div></div></div>';
+  var form = document.getElementById('order-form');
+  form.addEventListener('submit', onOrderSubmit);
+}
+function onOrderSubmit(e){
+  e.preventDefault();
+  var form=e.target, p=findProduct(form.dataset.id); if(!p) return;
+  var name=val('of-name'), phone=val('of-phone'), qty=parseInt(val('of-qty'),10)||1, note=val('of-note');
+  var ok=true;
+  ok = fieldCheck('of-name', name.length>=2) && ok;
+  ok = fieldCheck('of-phone', /^[0-9+()\-\s]{7,20}$/.test(phone)) && ok;
+  if(!ok) return;
+  var order = { id:uid(), productId:p.id, product:p.name, unitPrice:p.price, qty:qty,
+    total:p.price*qty, name:name, phone:phone, note:note, at:new Date().toISOString() };
+  var btn=form.querySelector('.btn'); btn.disabled=true; btn.textContent='שולח…';
+  submitOrder(order).then(function(where){
+    var body=form.closest('.p-body');
+    body.innerHTML = '<div class="success">'
+      + '<div class="ok-ring">✓</div>'
+      + '<h3>ההזמנה התקבלה</h3>'
+      + '<p>'+esc(order.product)+' × '+qty+' · סה״כ <b class="num">'+fmtPrice(order.total)+'</b></p>'
+      + '<p>מספר הזמנה: <span class="num">'+order.id.slice(0,6).toUpperCase()+'</span></p>'
+      + '<p>'+esc(state.brand.orderNote)+'</p>'
+      + (where==='local'?'<p class="fine">מצב הדגמה: ההזמנה נשמרה בדפדפן הזה בלבד ותופיע במסך ההזמנות של מצב העריכה.</p>':'')
+      + '<button class="btn btn-ghost" data-act="close" style="margin-top:10px">חזרה לגלריה</button>'
+      + '</div>';
+  });
+}
+function submitOrder(order){
+  if(dbNS){
+    return dbNS.collection('orders').doc(order.id).set(order)
+      .then(function(){ return 'db'; })
+      .catch(function(){ pushLocalOrder(order); return 'local'; });
+  }
+  pushLocalOrder(order);
+  return Promise.resolve('local');
+}
+function pushLocalOrder(order){ localOrders.unshift(order); saveOrders(); }
+function val(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
+function fieldCheck(id, ok){
+  var fld=document.getElementById(id).closest('.fld');
+  fld.classList.toggle('bad', !ok);
+  return ok;
+}
+function findProduct(id){ for(var i=0;i<state.products.length;i++){ if(state.products[i].id===id) return state.products[i]; } return null; }
+
+/* ============================================================
+   עורך מוצר (מצב ניהול)
+   ============================================================ */
+var edP=null, edIsNew=false;
+function openEditor(p){
+  edIsNew = !p;
+  edP = p ? clone(p) : { id:uid(), name:'', cat:(activeFilter!=='all'?activeFilter:'rings'),
+    price:0, material:'', desc:'', art:{metal:'gold',stone:'emerald'}, img:null };
+  var opts=function(map,sel,nameKey){ var h=''; for(var k in map){
+    h+='<option value="'+k+'"'+(k===sel?' selected':'')+'>'+ (nameKey?map[k][nameKey]:map[k]) +'</option>'; } return h; };
+  overlay.innerHTML = '<div class="scrim" data-act="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-label="עריכת מוצר">'
+    + '<button class="x" data-act="close" aria-label="סגירה">×</button>'
+    + '<form class="editor" id="ed-form" novalidate>'
+    + '<h2>'+(edIsNew?'מוצר חדש':'עריכת מוצר')+'</h2>'
+    + '<div class="ed-grid">'
+    +   '<div>'
+    +     '<div class="ed-preview" id="ed-preview">'+artOrImg(edP)+'</div>'
+    +     '<div class="ed-imgbtns">'
+    +       '<button type="button" class="btn btn-ghost mini" data-act="ed-upload">העלאת תמונה…</button>'
+    +       (edP.img?'<button type="button" class="btn btn-ghost mini" data-act="ed-clearimg">חזרה לאיור</button>':'')
+    +       '<input type="file" id="ed-img" accept="image/*" hidden>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div>'
+    +     '<div class="fld"><label for="ed-name">שם המוצר</label><input id="ed-name" value="'+esc(edP.name)+'" required><p class="err">למוצר צריך שם.</p></div>'
+    +     '<div class="two">'
+    +       '<div class="fld"><label for="ed-cat">קטגוריה</label><select id="ed-cat">'+opts(CATS,edP.cat)+'</select></div>'
+    +       '<div class="fld"><label for="ed-price">מחיר בש״ח</label><input id="ed-price" type="number" min="0" step="1" value="'+esc(edP.price)+'" required dir="ltr" style="text-align:right"><p class="err">מחיר בשקלים, מספר בלבד.</p></div>'
+    +     '</div>'
+    +     '<div class="fld"><label for="ed-material">שורת חומרים (מוצגת מתחת לשם)</label><input id="ed-material" value="'+esc(edP.material)+'" placeholder="למשל: זהב 14K · ברקת"></div>'
+    +     '<div class="fld"><label for="ed-desc">תיאור</label><textarea id="ed-desc">'+esc(edP.desc)+'</textarea></div>'
+    +     '<div class="two">'
+    +       '<div class="fld"><label for="ed-metal">מתכת (לאיור)</label><select id="ed-metal">'+opts(METALS,edP.art.metal,'name')+'</select></div>'
+    +       '<div class="fld"><label for="ed-stone">אבן (לאיור)</label><select id="ed-stone">'+opts(STONES,edP.art.stone,'name')+'</select></div>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="ed-actions">'
+    +   '<button class="btn" type="submit">'+(edIsNew?'הוספה לגלריה':'שמירת המוצר')+'</button>'
+    +   '<button class="btn btn-ghost" type="button" data-act="close">ביטול</button>'
+    +   '<span class="spacer"></span>'
+    +   (edIsNew?'':'<button class="btn btn-danger" type="button" data-act="ed-del">מחיקת המוצר</button>')
+    + '</div>'
+    + '<p class="fine">השינויים ייכנסו לתוקף רק אחרי «שמירה ופרסום» בסרגל התחתון.</p>'
+    + '</form></div></div>';
+  var form=document.getElementById('ed-form');
+  form.addEventListener('submit', onEditorSave);
+  form.addEventListener('input', onEditorInput);
+  form.addEventListener('change', onEditorInput);
+  document.getElementById('ed-img').addEventListener('change', onImgPick);
+}
+function onEditorInput(e){
+  if(e.target.id==='ed-metal'||e.target.id==='ed-stone'){
+    edP.art.metal=val('ed-metal'); edP.art.stone=val('ed-stone');
+    if(!edP.img){ document.getElementById('ed-preview').innerHTML = artSVG(edP); }
+  }
+}
+function onImgPick(e){
+  var f=e.target.files && e.target.files[0]; if(!f) return;
+  var fr=new FileReader();
+  fr.onload=function(){
+    var img=new Image();
+    img.onload=function(){
+      var mx=900, sc=Math.min(1, mx/Math.max(img.width,img.height));
+      var cv=document.createElement('canvas');
+      cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      edP.img = cv.toDataURL('image/jpeg',0.85);
+      document.getElementById('ed-preview').innerHTML = artOrImg(edP);
+      toast('התמונה נטענה — היא תישמר עם «שמירה ופרסום»');
+    };
+    img.src=fr.result;
+  };
+  fr.readAsDataURL(f);
+}
+function onEditorSave(e){
+  e.preventDefault();
+  var name=val('ed-name'), price=parseInt(val('ed-price'),10);
+  var ok = fieldCheck('ed-name', name.length>=1);
+  ok = fieldCheck('ed-price', !isNaN(price)&&price>=0) && ok;
+  if(!ok) return;
+  edP.name=name; edP.price=price; edP.cat=val('ed-cat');
+  edP.material=val('ed-material'); edP.desc=val('ed-desc');
+  edP.art.metal=val('ed-metal'); edP.art.stone=val('ed-stone');
+  if(edIsNew){ state.products.push(edP); }
+  else{
+    for(var i=0;i<state.products.length;i++){
+      if(state.products[i].id===edP.id){ state.products[i]=edP; break; }
+    }
+  }
+  closeOverlay(); markDirty(); render();
+  toast(edIsNew?'המוצר נוסף — לחצו «שמירה ופרסום» כדי שיעלה לאתר':'המוצר עודכן — נותר לשמור ולפרסם');
+}
+var delArmed=false;
+function onEditorDelete(btn){
+  if(!delArmed){ delArmed=true; btn.textContent='בטוח? מחיקה סופית'; return; }
+  state.products = state.products.filter(function(p){ return p.id!==edP.id; });
+  closeOverlay(); markDirty(); render(); toast('המוצר הוסר — נותר לשמור ולפרסם');
+}
+
+/* ============================================================
+   מסך הזמנות (מצב ניהול)
+   ============================================================ */
+function openOrders(){
+  overlay.innerHTML = '<div class="scrim" data-act="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-label="הזמנות">'
+    + '<button class="x" data-act="close" aria-label="סגירה">×</button>'
+    + '<div class="orders"><h2>הזמנות שהתקבלו</h2><p class="src" id="orders-src"></p><div id="orders-list"></div></div>'
+    + '</div></div>';
+  dbOrders=null;
+  if(dbNS){
+    ordersUnsub = dbNS.collection('orders').orderBy('at','desc').limit(200).onSnapshot(function(snap){
+      dbOrders = snap.docs.map(function(d){ return d.data(); });
+      renderOrdersList();
+    }, function(){ dbOrders=null; renderOrdersList(); });
+  }
+  renderOrdersList();
+}
+function renderOrdersList(){
+  var list=document.getElementById('orders-list'); if(!list) return;
+  var src=document.getElementById('orders-src');
+  var rows=[];
+  if(dbOrders){ rows = dbOrders.map(function(o){ return {o:o, from:'db'}; }); }
+  localOrders.forEach(function(o){ rows.push({o:o, from:'local'}); });
+  src.textContent = dbNS
+    ? 'הזמנות מהאתר החי נשמרות במסד הנתונים של הארטיפקט; הזמנות שסומנו «דפדפן זה» נשמרו מקומית.'
+    : 'מצב הדגמה ללא שרת — מוצגות הזמנות שנשמרו בדפדפן הזה בלבד.';
+  if(!rows.length){ list.innerHTML='<p class="empty-note">עוד אין הזמנות. צאו ממצב עריכה ונסו לשלוח הזמנה מדף מוצר.</p>'; return; }
+  list.innerHTML = rows.map(function(r){
+    var o=r.o, when=new Date(o.at).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'});
+    return '<div class="order-row">'
+      + '<div class="head">'+esc(o.product)+' × '+esc(o.qty)+' <span class="price">'+fmtPrice(o.total)+'</span></div>'
+      + '<button class="mini btn-danger del" data-act="order-del" data-id="'+esc(o.id)+'" data-from="'+r.from+'">הסרה</button>'
+      + '<div class="meta">'+esc(o.name)+' · <span dir="ltr">'+esc(o.phone)+'</span>'
+      + (o.note?' · <span class="note">'+esc(o.note)+'</span>':'')+'</div>'
+      + '<div class="when">'+esc(when)+(r.from==='local'?' · דפדפן זה':'')+'</div>'
+      + '</div>';
+  }).join('');
+}
+function deleteOrder(id, from, btn){
+  if(btn.dataset.armed!=='1'){ btn.dataset.armed='1'; btn.textContent='בטוח?'; return; }
+  if(from==='db' && dbNS){ dbNS.collection('orders').doc(id).delete().catch(function(){ toast('המחיקה נכשלה — נסו שוב'); }); }
+  else{ localOrders = localOrders.filter(function(o){ return o.id!==id; }); saveOrders(); renderOrdersList(); }
+}
+
+/* ============================================================
+   מצב עריכה, שמירה ופרסום
+   ============================================================ */
+var savebar=document.createElement('div'); savebar.className='savebar'; document.body.appendChild(savebar);
+var toastEl=document.createElement('div'); toastEl.className='toast'; document.body.appendChild(toastEl);
+var toastTimer=null;
+function toast(msg){
+  toastEl.textContent=msg; toastEl.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ toastEl.classList.remove('show'); }, 3600);
+}
+function updateBar(){
+  if(!editMode){ savebar.innerHTML=''; return; }
+  var target = artifactNS ? 'השינויים יפורסמו לכל מי שצופה באתר'
+    : (capsReady ? 'מצב הדגמה — השינויים יישמרו בדפדפן הזה' : 'בודק חיבור…');
+  var h = dirty
+    ? '<span class="msg"><b>יש שינויים שלא נשמרו.</b> '+target+'</span>'
+      + '<button class="btn" data-act="save">שמירה ופרסום</button>'
+      + '<button class="btn btn-ghost" data-act="discard">ביטול שינויים</button>'
+    : '<span class="msg">מצב עריכה פעיל — לחצו על כל טקסט או מוצר כדי לערוך</span>';
+  h += '<button class="btn btn-ghost" data-act="orders">הזמנות'+(localOrders.length?' ('+localOrders.length+')':'')+'</button>'
+    + '<button class="btn btn-ghost" data-act="exit-edit">סיום עריכה</button>';
+  savebar.innerHTML=h;
+}
+function commitEdit(el){
+  var path=el.dataset.edit.split('.'), v=el.innerText.replace(/\u00A0/g,' ').trim();
+  var o=state; for(var i=0;i<path.length-1;i++){ o=o[path[i]]; }
+  if(o[path[path.length-1]]===v) return;
+  o[path[path.length-1]]=v;
+  markDirty();
+  if(el.dataset.edit==='brand.name'){ render(); }
+}
+function saveAll(){
+  if(artifactNS){
+    toast('מפרסם גרסה חדשה…');
+    artifactNS.publish(buildDocument(state)).then(function(){
+      try{ localStorage.removeItem(LSK); }catch(e){}
+      /* התצוגה נטענת מחדש מיד עם הגרסה החדשה */
+    }).catch(function(err){
+      var code=err&&err.code;
+      if(code==='conflict'){ toast('מישהו פרסם גרסה חדשה במקביל — הדף נטען מחדש'); return; }
+      if(code==='not_writer'||code==='not_granted'){
+        saveLocal(); toast('אין לך הרשאת פרסום לאתר — השינויים נשמרו בדפדפן זה בלבד');
+      }else if(code==='too_large'){
+        toast('הגרסה גדולה מדי לפרסום — נסו תמונות קטנות יותר');
+      }else{
+        saveLocal(); toast('הפרסום נכשל ('+esc(code||'שגיאה')+') — השינויים נשמרו בדפדפן זה');
+      }
+      savedSnapshot=clone(state); markDirty();
+    });
+    return;
+  }
+  if(saveLocal()){
+    savedSnapshot=clone(state); markDirty();
+    toast('נשמר בדפדפן הזה (מצב הדגמה — באתר החי השמירה מפרסמת לכולם)');
+  }else{
+    toast('השמירה נכשלה — ייתכן שהתמונות גדולות מדי לאחסון הדפדפן');
+  }
+}
+function discardChanges(){
+  state=clone(savedSnapshot);
+  try{ localStorage.removeItem(LSK); }catch(e){}
+  markDirty(); render(); toast('השינויים בוטלו');
+}
+
+/* בניית מסמך מלא לפרסום — מאותם מקורות שמהם הדף הזה עצמו בנוי */
+function buildDocument(st){
+  var json=JSON.stringify(st,null,1).replace(/</g,'\\u003c');
+  var css=document.getElementById('site-style').textContent;
+  var js=document.getElementById('site-script').textContent;
+  return '<!doctype html>\n<html lang="he" dir="rtl">\n<head>\n'
+    + '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+    + '<title>'+esc(st.brand.name||'סטודיו נוגה')+'<\/title>\n'
+    + FONTS + '\n'
+    + '<style id="site-style">'+css+'<\/style>\n'
+    + '<\/head>\n<body>\n<div id="app"><\/div>\n<div id="overlay"><\/div>\n'
+    + '<script type="application/json" id="site-data">\n'+json+'\n<\/scr'+'ipt>\n'
+    + '<script id="site-script">'+js+'<\/scr'+'ipt>\n'
+    + '<\/body>\n<\/html>\n';
+}
+
+/* ============================================================
+   אירועים
+   ============================================================ */
+function closeOverlay(){
+  overlay.innerHTML='';
+  delArmed=false;
+  if(ordersUnsub){ ordersUnsub(); ordersUnsub=null; }
+}
+document.addEventListener('click', function(e){
+  var el=e.target.closest('[data-act]'); if(!el) return;
+  var act=el.dataset.act;
+  if(act==='toggle-edit'){ editMode=!editMode; render(); updateBar(); if(editMode){ toast('מצב עריכה: לחצו על טקסטים ומוצרים. «שמירה ופרסום» מקבעת הכול.'); } }
+  else if(act==='exit-edit'){ editMode=false; render(); updateBar(); }
+  else if(act==='filter'){ activeFilter=el.dataset.cat; render(); }
+  else if(act==='open'){ if(e.target.closest('[data-edit]')) return; var p=findProduct(el.dataset.id); if(p){ editMode?openEditor(p):openProduct(p); } }
+  else if(act==='add'){ openEditor(null); }
+  else if(act==='close'){ closeOverlay(); }
+  else if(act==='scrim'){ if(e.target===el) closeOverlay(); }
+  else if(act==='save'){ saveAll(); }
+  else if(act==='discard'){ discardChanges(); }
+  else if(act==='orders'){ openOrders(); }
+  else if(act==='order-del'){ deleteOrder(el.dataset.id, el.dataset.from, el); }
+  else if(act==='ed-upload'){ document.getElementById('ed-img').click(); }
+  else if(act==='ed-clearimg'){ edP.img=null; document.getElementById('ed-preview').innerHTML=artSVG(edP); el.remove(); }
+  else if(act==='ed-del'){ onEditorDelete(el); }
+});
+document.addEventListener('keydown', function(e){
+  if(e.key==='Enter' && e.target.matches && e.target.matches('.card[data-act="open"]')){ e.target.click(); }
+  if(e.key==='Escape' && overlay.firstChild){ closeOverlay(); }
+  if(e.key==='Enter' && e.target.matches && e.target.matches('[data-edit]') && e.target.tagName!=='P'){ e.preventDefault(); e.target.blur(); }
+});
+document.addEventListener('focusout', function(e){
+  if(e.target.matches && e.target.matches('[data-edit]')){ commitEdit(e.target); }
+});
+document.addEventListener('paste', function(e){
+  if(e.target.matches && e.target.matches('[data-edit]')){
+    e.preventDefault();
+    var t=(e.clipboardData||window.clipboardData).getData('text');
+    document.execCommand('insertText', false, t);
+  }
+});
+
+/* ============================================================
+   אתחול ויכולות פלטפורמה
+   ============================================================ */
+render(); updateBar();
+(function(){
+  if(!(window.claude && window.claude.use)){ capsReady=true; updateBar(); return; }
+  Promise.all([
+    window.claude.use('artifact').catch(function(){ return null; }),
+    window.claude.use('db').catch(function(){ return null; })
+  ]).then(function(res){
+    artifactNS=res[0]; dbNS=res[1]; capsReady=true;
+    if(artifactNS){
+      var draft=loadLocal();
+      if(draft && JSON.stringify(draft)===JSON.stringify(EMBED)){
+        try{ localStorage.removeItem(LSK); }catch(e){}
+      }else if(draft){
+        savedSnapshot=clone(EMBED);
+      }
+    }
+    markDirty(); updateBar();
+  });
+})();
+</script>
+<!--ARTIFACT:END-->
+</body>
+</html>
