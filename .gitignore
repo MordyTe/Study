@@ -1,10 +1,18 @@
+# Dependencies
 node_modules/
+# Build output
+dist/
+build/
 .next/
 out/
-build/
+# Environment
 .env
-.env.local
-.env*.local
-*.tsbuildinfo
-next-env.d.ts
+.env.*
+!.env.example
+# Logs
+*.log
+# OS / editor
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
