@@ -81,6 +81,11 @@ llm_correction:
   compression_ratio_threshold: 2.4
   model: claude-opus-4-8
 
+# --- Quick mic test (default microphone, zero-setup sanity check) ---
+mic_test:
+  model: ""          # empty -> use the main model above
+  interval_s: 4.0    # transcribe the buffered speech every N seconds
+
 # --- Operator web app (Stage 4): studio-transcribe serve ---
 server:
   host: 127.0.0.1          # 0.0.0.0 to allow other machines on the studio LAN

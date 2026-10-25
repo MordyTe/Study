@@ -79,6 +79,31 @@ def test_transcribe_job(monkeypatch, tmp_path):
         assert "מנחה: שלום" in dl.text
 
 
+def test_mic_endpoints_exist(monkeypatch):
+    # Patch the runner so no real microphone/engine is needed.
+    import studio_transcribe.server.service as service
+
+    class _FakeMic:
+        def __init__(self, *a, **k):
+            self.running = False
+
+        def start(self):
+            self.running = True
+
+        def stop(self):
+            self.running = False
+
+    monkeypatch.setattr(service, "MicTestRunner", _FakeMic, raising=False)
+    import studio_transcribe.live.mic_test as mt
+
+    monkeypatch.setattr(mt, "MicTestRunner", _FakeMic)
+
+    with TestClient(create_app()) as client:
+        assert client.post("/api/mic/start").json()["running"] is True
+        assert client.get("/api/status").json()["mic_running"] is True
+        assert client.post("/api/mic/stop").json()["running"] is False
+
+
 def test_websocket_sends_initial_status():
     with TestClient(create_app()) as client:
         with client.websocket_connect("/api/ws?token=") as websocket:

@@ -86,6 +86,14 @@ class LiveConfig:
 
 
 @dataclass
+class MicTestConfig:
+    """Quick default-microphone test (zero-setup sanity check)."""
+
+    model: str = ""  # empty -> use the main config.model
+    interval_s: float = 4.0  # how often to transcribe the buffered speech
+
+
+@dataclass
 class ServerConfig:
     """Operator web app (Stage 4)."""
 
@@ -111,6 +119,7 @@ class Config:
     cloud: CloudConfig = field(default_factory=CloudConfig)
     llm_correction: LLMCorrectionConfig = field(default_factory=LLMCorrectionConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
+    mic_test: MicTestConfig = field(default_factory=MicTestConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
 
     def speaker_map(self) -> Dict[int, str]:
@@ -139,6 +148,7 @@ class Config:
             cloud=CloudConfig(**d.get("cloud", {})),
             llm_correction=LLMCorrectionConfig(**d.get("llm_correction", {})),
             live=LiveConfig(**d.get("live", {})),
+            mic_test=MicTestConfig(**d.get("mic_test", {})),
             server=ServerConfig(**d.get("server", {})),
         )
 

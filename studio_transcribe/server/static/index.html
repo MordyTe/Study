@@ -16,15 +16,28 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-tab="live">חי</button>
+    <button class="tab active" data-tab="mic">בדיקת מיקרופון</button>
+    <button class="tab" data-tab="live">חי</button>
     <button class="tab" data-tab="transcribe">תמלול</button>
     <button class="tab" data-tab="archive">ארכיון</button>
     <button class="tab" data-tab="settings">הגדרות</button>
   </nav>
 
   <main>
+    <!-- MIC TEST -->
+    <section id="mic" class="panel active">
+      <h3>בדיקת מיקרופון מהירה</h3>
+      <p class="muted">הדרך הכי פשוטה לבדוק שהתמלול עובד — מהמיקרופון של המחשב, בלי שום
+        חיבור או הגדרה. לוחצים התחלה, מדברים, ורואים את הטקסט. (בהרצה הראשונה המודל יורד,
+        זה עשוי לקחת דקה.)</p>
+      <button id="micToggle" class="big-btn start">🎤 התחלת בדיקה</button>
+      <div id="micStatus" class="muted" style="margin-top:12px"></div>
+      <h3>תמלול</h3>
+      <div id="micOut" class="captions" style="font-size:20px"></div>
+    </section>
+
     <!-- LIVE -->
-    <section id="live" class="panel active">
+    <section id="live" class="panel">
       <div class="live-controls">
         <button id="liveToggle" class="big-btn start">▶ הדלקת כתוביות חיות</button>
         <div class="live-meta">

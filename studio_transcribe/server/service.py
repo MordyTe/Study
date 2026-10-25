@@ -47,6 +47,7 @@ class AppState:
         self.out_dir = out_dir
         self.config = self._load_config()
         self.live_runner = None
+        self.mic_runner = None
         self.jobs: Dict[str, Job] = {}
         self.ws_clients: set = set()
         self.loop: Optional[asyncio.AbstractEventLoop] = None
@@ -106,6 +107,28 @@ class AppState:
         if self.live_runner is None:
             return {"running": False, "channels": self.config.enabled_channels()[:4]}
         return self.live_runner.status()
+
+    # --- quick mic test ---
+    def start_mic_test(self) -> Dict:
+        from ..live.mic_test import MicTestRunner
+
+        if self.mic_runner is not None and self.mic_runner.running:
+            return {"running": True}
+
+        def on_event(ev: Dict):
+            self.publish({"type": "mic", **ev})
+
+        self.mic_runner = MicTestRunner(self.config, on_event)
+        self.mic_runner.start()
+        return {"running": True}
+
+    def stop_mic_test(self) -> Dict:
+        if self.mic_runner is not None:
+            self.mic_runner.stop()
+        return {"running": False}
+
+    def mic_running(self) -> bool:
+        return self.mic_runner is not None and self.mic_runner.running
 
     # --- offline transcription jobs ---
     def start_job(self, input_path: str, formats: List[str]) -> str:

@@ -57,6 +57,7 @@ def create_app(config_path: Optional[str] = None, out_dir: str = "out") -> FastA
     async def status():
         return {
             "live": state.live_status(),
+            "mic_running": state.mic_running(),
             "db_path": state.config.db_path,
             "glossary_path": state.config.glossary_path,
             "engine": state.config.engine,
@@ -88,6 +89,18 @@ def create_app(config_path: Optional[str] = None, out_dir: str = "out") -> FastA
     @app.post("/api/live/stop", dependencies=[auth])
     async def live_stop():
         return state.stop_live()
+
+    # --- quick mic test ---
+    @app.post("/api/mic/start", dependencies=[auth])
+    async def mic_start():
+        try:
+            return state.start_mic_test()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    @app.post("/api/mic/stop", dependencies=[auth])
+    async def mic_stop():
+        return state.stop_mic_test()
 
     # --- transcription jobs ---
     @app.post("/api/transcribe", dependencies=[auth])

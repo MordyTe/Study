@@ -49,6 +49,7 @@ async function loadStatus() {
   const s = await api("/api/status");
   const live = s.live || {};
   setLivePill(!!live.running);
+  setMicPill(!!s.mic_running);
   document.getElementById("liveEngine").textContent = live.engine || s.engine || "—";
   document.getElementById("liveSink").textContent = live.sink || "—";
   document.getElementById("liveActive").textContent =
@@ -79,6 +80,23 @@ document.getElementById("liveToggle").onclick = async () => {
   }
 };
 
+/* ---------- mic test ---------- */
+document.getElementById("micToggle").onclick = async () => {
+  const on = document.getElementById("micToggle").dataset.on === "1";
+  try {
+    await api(on ? "/api/mic/stop" : "/api/mic/start", { method: "POST" });
+    setMicPill(!on);
+  } catch (e) {
+    document.getElementById("micStatus").textContent = "שגיאה: " + e.message;
+  }
+};
+function setMicPill(on) {
+  const btn = document.getElementById("micToggle");
+  btn.className = "big-btn " + (on ? "stop" : "start");
+  btn.textContent = on ? "■ עצירת בדיקה" : "🎤 התחלת בדיקה";
+  btn.dataset.on = on ? "1" : "";
+}
+
 /* ---------- websocket ---------- */
 function connectWS() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -88,8 +106,20 @@ function connectWS() {
     if (msg.type === "caption") document.getElementById("captions").textContent = msg.text;
     else if (msg.type === "status") loadStatus();
     else if (msg.type === "job") renderJob(msg.job);
+    else if (msg.type === "mic") handleMic(msg);
   };
   ws.onclose = () => setTimeout(connectWS, 3000);
+}
+
+function handleMic(msg) {
+  if (msg.kind === "text") {
+    const out = document.getElementById("micOut");
+    out.textContent += (out.textContent ? "\n" : "") + msg.text;
+    out.scrollTop = out.scrollHeight;
+  } else if (msg.kind === "status" || msg.kind === "error") {
+    document.getElementById("micStatus").textContent =
+      (msg.kind === "error" ? "שגיאה: " : "") + msg.text;
+  }
 }
 
 /* ---------- transcribe jobs ---------- */
