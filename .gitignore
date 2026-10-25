@@ -27,3 +27,6 @@ __pycache__/
 rec/
 *.wav
 *.flac
+
+# Simple speaker transcriber output
+simple_transcriber/transcripts/
