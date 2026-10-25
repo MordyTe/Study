@@ -6,6 +6,8 @@ Only depends on numpy.
 
 from __future__ import annotations
 
+import json
+import math
 import os
 from datetime import datetime
 from typing import List, Optional
@@ -22,6 +24,37 @@ def to_mono(data: np.ndarray) -> np.ndarray:
     if data.ndim == 2:
         data = data.mean(axis=1)
     return data.astype(np.float32, copy=False)
+
+
+def mix_down(data: np.ndarray) -> np.ndarray:
+    """Mix any input device down to mono.
+
+    Mono/stereo devices are averaged. Multichannel devices (e.g. a 32-channel
+    mixer USB/Dante interface) are *summed* and clipped instead: averaging 32
+    channels where only one mic is active would shrink that mic ~32x, below
+    the speech threshold.
+    """
+
+    data = np.asarray(data, dtype=np.float32)
+    if data.ndim == 1:
+        return data
+    if data.shape[1] <= 2:
+        return data.mean(axis=1).astype(np.float32)
+    return np.clip(data.sum(axis=1), -1.0, 1.0).astype(np.float32)
+
+
+def level(signal: np.ndarray) -> float:
+    """Loudness for the on-screen meter: 0.0 (silence) .. 1.0 (full scale),
+    on a -60..0 dB scale so normal speech sits in the middle of the bar."""
+
+    signal = np.asarray(signal, dtype=np.float32)
+    if signal.size == 0:
+        return 0.0
+    rms = float(np.sqrt(np.mean(signal * signal)))
+    if rms <= 1e-6:
+        return 0.0
+    db = 20.0 * math.log10(rms)
+    return max(0.0, min(1.0, (db + 60.0) / 60.0))
 
 
 def resample(signal: np.ndarray, orig_sr: int, target_sr: int = TARGET_SR) -> np.ndarray:
@@ -139,3 +172,19 @@ class TranscriptWriter:
         with open(self.path, "a", encoding="utf-8") as handle:
             handle.write(line + "\n")
             handle.flush()
+
+
+def load_settings(path: str) -> dict:
+    """Read the small settings file; a missing or corrupt file means defaults."""
+
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_settings(path: str, settings: dict) -> None:
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(settings, handle, ensure_ascii=False, indent=2)

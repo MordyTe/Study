@@ -30,3 +30,5 @@ rec/
 
 # Simple speaker transcriber output
 simple_transcriber/transcripts/
+simple_transcriber/settings.json
+simple_transcriber/*.log
