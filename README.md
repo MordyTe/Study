@@ -41,12 +41,15 @@ studio_transcribe/        חבילת הפייתון
   export.py               ייצוא SRT/VTT/TXT/DOCX
   glossary.py             טעינת מילון + בניית initial_prompt
   config.py               קונפיגורציה (dict/YAML)
+  store.py                אחסון SQLite + חיפוש full-text (FTS5/LIKE)
   audio_io.py             קריאת אודיו + resample ל‑16kHz mono
   vad.py                  Silero VAD (לשכבה החיה / pre-gating)
   llm_correction.py       תיקון-LLM מבוקר (low-confidence בלבד)
   pipeline.py             הצינור ה-offline המלא
-  cli.py                  ממשק שורת פקודה
+  cli.py                  ממשק שורת פקודה (transcribe/search/live/eval)
   engines/                מנועי ASR (faster-whisper מקומי, cloud scaffold)
+  live/                   כתוביות חיות: capture_stream, soniox_client,
+                          vad_gate, captions, sinks (OBS/vMix/file), runner
 capture/capture_asio.py   שלב 0: לכידת ערוצי X32 דרך ASIO ל‑WAV נפרד
 config/                   דוגמאות קונפיג + מילון
 tests/                    טסטים ל‑core הדטרמיניסטי (40 טסטים)
@@ -86,6 +89,24 @@ studio-transcribe transcribe rec/ -c config/config.yaml -o out -f txt srt docx
 python -m studio_transcribe transcribe rec/ -c config/config.yaml -f txt srt
 ```
 
+**שלב 2 — אחסון וחיפוש:**
+
+```bash
+# שמירה ל‑DB תוך כדי תמלול
+studio-transcribe transcribe rec/ -c config/config.yaml --db studio.db --session-name "פרק 1"
+# חיפוש full-text (עברית/אנגלית), עם סינון דובר אופציונלי
+studio-transcribe search "Dante" --db studio.db
+studio-transcribe search "ברוכים הבאים" --db studio.db --speaker "מנחה"
+```
+
+**שלב 3 — כתוביות חיות (Soniox → OBS/vMix):**
+
+```bash
+export STUDIO_TRANSCRIBE_CLOUD_KEY=...      # מפתח Soniox
+studio-transcribe live -c config/config.yaml --db studio.db
+# מזרים את ערוצי ה‑X32 ל‑Soniox ודוחף כתוביות ל‑OBS/vMix לפי סקשן live בקונפיג
+```
+
 **מדידת דיוק (WER/CER) מול תמלול-אמת:**
 
 ```bash
@@ -113,10 +134,10 @@ pip install pytest && python -m pytest        # 40 טסטים ל‑core
 
 - [x] שלב 0: לכידת ערוצי X32 דרך ASIO
 - [x] שלב 1: צינור תמלול מדויק (offline) + ייצוא + מדידת WER
-- [ ] שלב 2: אחסון SQLite + חיפוש full-text
-- [ ] שלב 3: שכבת כתוביות חיות → OBS (obs-websocket) / vMix (API)
-- [ ] שלב 4: hybrid ענן בעומס + ניהול glossary ב‑UI
-- [ ] שלב 5: הקשחה, ניטור, התאוששות מכשל
+- [x] שלב 2: אחסון SQLite (FTS5) + חיפוש full-text
+- [x] שלב 3: כתוביות חיות → Soniox (ענן) → OBS (obs-websocket) / vMix (API) / קובץ
+- [ ] שלב 4: מתג hybrid ענן בעומס + ניהול glossary ב‑UI
+- [ ] שלב 5: הקשחה, ניטור, התאוששות מכשל, UI ניטור
 
 ## רישיון
 

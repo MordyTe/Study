@@ -23,5 +23,10 @@ python-docx>=1.1             # DOCX export (speaker-labeled, RTL)
 # --- Optional: live VAD / streaming gating ---
 # torch>=2.2                  # required only for the standalone Silero VAD wrapper
 
+# --- Live captions (Stage 3) ---
+websocket-client>=1.7        # Soniox real-time WebSocket
+obsws-python>=1.7           # OBS caption source (obs-websocket v5)
+requests>=2.31              # vMix Web API caption field
+
 # --- Optional: gated LLM post-correction ---
 # anthropic>=0.40            # required only if llm_correction.enabled = true

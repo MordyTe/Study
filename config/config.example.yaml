@@ -16,6 +16,9 @@ join_gap: 0.8
 # Glossary of names / show terms / English brand+tech terms (one per line).
 glossary_path: config/glossary.txt
 
+# Persistent, searchable transcript DB (SQLite). Optional.
+db_path: studio.db
+
 # --- Channel -> speaker map (channel number = X32 mic = speaker) ---
 channels:
   - { index: 1, speaker: "מנחה" }
@@ -46,6 +49,30 @@ cloud:
   enabled: false
   provider: soniox                 # soniox | elevenlabs | azure
   api_key_env: STUDIO_TRANSCRIBE_CLOUD_KEY
+
+# --- Live captions (Stage 3): Soniox (cloud) -> OBS / vMix ---
+# Live runs on the cloud (no local GPU during broadcast); the accurate archive
+# is produced afterwards by the local ivrit.ai pass on the recording.
+live:
+  enabled: false
+  engine: soniox                   # soniox (cloud) | zipformer (local, future)
+  model: stt-rt-v4
+  throttle_ms: 300                 # min ms between caption refreshes
+  max_chars: 120                   # per caption line
+  max_lines: 2                     # how many simultaneous speakers to show
+  energy_threshold: 0.0001         # silence gate before streaming a channel
+  sink: stdout                     # obs | vmix | file | stdout
+  obs:
+    host: localhost
+    port: 4455
+    password: ""
+    source: captions               # name of the OBS Text (GDI+) source
+  vmix:
+    url: http://127.0.0.1:8088/api/
+    input: ""                      # vMix input name/number of the Title
+    field: Headline.Text           # title field to set
+  file:
+    path: captions.txt             # for OBS "text from file" / vMix Data Source
 
 # --- Optional gated LLM post-correction (low-confidence segments only) ---
 llm_correction:

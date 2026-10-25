@@ -25,13 +25,14 @@ dependencies = [
 capture = ["sounddevice>=0.4"]
 vad = ["torch>=2.2"]
 llm = ["anthropic>=0.40"]
+live = ["sounddevice>=0.4", "websocket-client>=1.7", "obsws-python>=1.7", "requests>=2.31"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]
 studio-transcribe = "studio_transcribe.cli:main"
 
 [tool.setuptools]
-packages = ["studio_transcribe", "studio_transcribe.engines"]
+packages = ["studio_transcribe", "studio_transcribe.engines", "studio_transcribe.live"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

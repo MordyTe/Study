@@ -69,6 +69,23 @@ class LLMCorrectionConfig:
 
 
 @dataclass
+class LiveConfig:
+    """Live-caption layer (Stage 3)."""
+
+    enabled: bool = False
+    engine: str = "soniox"  # soniox (cloud) | zipformer (local)
+    model: str = "stt-rt-v4"
+    throttle_ms: int = 300
+    max_chars: int = 120
+    max_lines: int = 2
+    energy_threshold: float = 1e-4  # per-channel silence gate before streaming
+    sink: str = "stdout"  # obs | vmix | file | stdout
+    obs: Dict[str, Any] = field(default_factory=dict)  # host, port, password, source
+    vmix: Dict[str, Any] = field(default_factory=dict)  # url, input, field
+    file: Dict[str, Any] = field(default_factory=dict)  # path
+
+
+@dataclass
 class Config:
     engine: str = "faster-whisper"
     model: str = "ivrit-ai/whisper-large-v3-turbo-ct2"
@@ -78,11 +95,13 @@ class Config:
     sample_rate: int = 16000
     join_gap: float = 0.8
     glossary_path: Optional[str] = None
+    db_path: Optional[str] = None
     channels: List[ChannelConfig] = field(default_factory=list)
     vad: VadConfig = field(default_factory=VadConfig)
     decode: DecodeConfig = field(default_factory=DecodeConfig)
     cloud: CloudConfig = field(default_factory=CloudConfig)
     llm_correction: LLMCorrectionConfig = field(default_factory=LLMCorrectionConfig)
+    live: LiveConfig = field(default_factory=LiveConfig)
 
     def speaker_map(self) -> Dict[int, str]:
         return {c.index: c.speaker for c in self.channels if c.speaker}
@@ -103,11 +122,13 @@ class Config:
             sample_rate=int(d.get("sample_rate", cls.sample_rate)),
             join_gap=float(d.get("join_gap", cls.join_gap)),
             glossary_path=d.get("glossary_path"),
+            db_path=d.get("db_path"),
             channels=channels,
             vad=VadConfig(**d.get("vad", {})),
             decode=DecodeConfig(**d.get("decode", {})),
             cloud=CloudConfig(**d.get("cloud", {})),
             llm_correction=LLMCorrectionConfig(**d.get("llm_correction", {})),
+            live=LiveConfig(**d.get("live", {})),
         )
 
     @classmethod

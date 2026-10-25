@@ -56,6 +56,48 @@ def _cmd_transcribe(args: argparse.Namespace) -> int:
     written = export_all(segments, args.out_dir, base, args.formats, title=base)
     for path in written:
         print(path)
+
+    db_path = args.db or config.db_path
+    if db_path:
+        from .store import TranscriptStore
+
+        with TranscriptStore(db_path) as store:
+            session_id = store.create_session(
+                name=args.session_name or base, source=args.input
+            )
+            n = store.add_segments(session_id, segments)
+        print(f"stored {n} segments in {db_path} (session {session_id})", file=sys.stderr)
+    return 0
+
+
+def _cmd_search(args: argparse.Namespace) -> int:
+    from .store import TranscriptStore
+
+    with TranscriptStore(args.db) as store:
+        hits = store.search(
+            args.query,
+            speaker=args.speaker,
+            session_id=args.session,
+            limit=args.limit,
+        )
+    for h in hits:
+        ts = f"{h['start']:.1f}" if h.get("start") is not None else "?"
+        print(f"[{h.get('session_name', '')} @ {ts}s] {h.get('speaker', '')}: {h['text']}")
+    if not hits:
+        print("no matches", file=sys.stderr)
+    return 0
+
+
+def _cmd_live(args: argparse.Namespace) -> int:
+    from .config import Config
+    from .live.runner import LiveRunner
+
+    config = Config.from_yaml(args.config) if args.config else Config.from_dict({})
+    config.live.enabled = True
+    if args.db:
+        config.db_path = args.db
+    print("live captions running — Ctrl-C to stop", file=sys.stderr)
+    LiveRunner(config).run()
     return 0
 
 
@@ -87,7 +129,22 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--channels", nargs="+", type=int, help="1-based channel numbers")
     t.add_argument("--model", help="override the ASR model")
     t.add_argument("--device", help="auto | cuda | cpu")
+    t.add_argument("--db", help="persist segments to this SQLite DB")
+    t.add_argument("--session-name", help="session name for the DB")
     t.set_defaults(func=_cmd_transcribe)
+
+    s = sub.add_parser("search", help="full-text search the transcript DB")
+    s.add_argument("query", help="text to search for")
+    s.add_argument("--db", required=True, help="SQLite DB path")
+    s.add_argument("--speaker", help="filter by speaker")
+    s.add_argument("--session", type=int, help="filter by session id")
+    s.add_argument("--limit", type=int, default=50)
+    s.set_defaults(func=_cmd_search)
+
+    live = sub.add_parser("live", help="run live captions (Soniox -> OBS/vMix)")
+    live.add_argument("-c", "--config", help="YAML config path")
+    live.add_argument("--db", help="persist finalized captions to this SQLite DB")
+    live.set_defaults(func=_cmd_live)
 
     e = sub.add_parser("eval", help="measure WER/CER against a reference")
     e.add_argument("reference", help="ground-truth transcript (text file)")
