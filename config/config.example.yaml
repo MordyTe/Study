@@ -1,0 +1,55 @@
+# studio-transcribe — example configuration.
+# Copy to config/config.yaml and edit. Every field has a default; the minimum
+# you need is the channel -> speaker map.
+
+# --- ASR engine ---
+engine: faster-whisper                    # faster-whisper (local) | cloud
+model: ivrit-ai/whisper-large-v3-turbo-ct2  # ivrit.ai Hebrew fine-tune (best accuracy)
+device: auto                              # auto | cuda | cpu
+compute_type: auto                        # auto | float16 | int8_float16 | int8
+language: he                              # forced; ivrit.ai models need explicit language
+sample_rate: 16000
+
+# Join adjacent same-speaker segments separated by <= this many seconds.
+join_gap: 0.8
+
+# Glossary of names / show terms / English brand+tech terms (one per line).
+glossary_path: config/glossary.txt
+
+# --- Channel -> speaker map (channel number = X32 mic = speaker) ---
+channels:
+  - { index: 1, speaker: "מנחה" }
+  - { index: 2, speaker: "אורח 1" }
+  - { index: 3, speaker: "אורח 2" }
+  - { index: 4, speaker: "אורח 3", enabled: false }
+
+# --- Voice Activity Detection (anti-hallucination) ---
+vad:
+  enabled: true
+  threshold: 0.5            # higher = stricter
+  min_speech_ms: 250
+  min_silence_ms: 400
+  speech_pad_ms: 150
+
+# --- Decoding (tuned for Hebrew accuracy + anti-loop) ---
+decode:
+  beam_size: 5
+  temperature: 0.0
+  condition_on_previous_text: false   # true fuels repetition loops in Hebrew
+  compression_ratio_threshold: 2.4
+  log_prob_threshold: -1.0
+  no_speech_threshold: 0.6
+  word_timestamps: true
+
+# --- Optional cloud fallback / live code-switching ---
+cloud:
+  enabled: false
+  provider: soniox                 # soniox | elevenlabs | azure
+  api_key_env: STUDIO_TRANSCRIBE_CLOUD_KEY
+
+# --- Optional gated LLM post-correction (low-confidence segments only) ---
+llm_correction:
+  enabled: false
+  logprob_threshold: -0.7
+  compression_ratio_threshold: 2.4
+  model: claude-opus-4-8

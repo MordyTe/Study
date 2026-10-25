@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "studio-transcribe"
+version = "0.1.0"
+description = "High-accuracy, speaker-tagged studio transcription (Hebrew + English) for an X32/Dante broadcast setup"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+# Runtime deps are listed in requirements.txt. The pure-stdlib core needs none
+# of them; declare the common ones here for `pip install .` on the node.
+dependencies = [
+    "faster-whisper>=1.1.0",
+    "numpy>=1.26",
+    "soundfile>=0.12",
+    "soxr>=0.5",
+    "pyyaml>=6.0",
+    "python-docx>=1.1",
+]
+
+[project.optional-dependencies]
+capture = ["sounddevice>=0.4"]
+vad = ["torch>=2.2"]
+llm = ["anthropic>=0.40"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+studio-transcribe = "studio_transcribe.cli:main"
+
+[tool.setuptools]
+packages = ["studio_transcribe", "studio_transcribe.engines"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

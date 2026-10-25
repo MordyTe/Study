@@ -1,0 +1,21 @@
+# Glossary / custom vocabulary — one term per line.
+# Lines starting with '#' and blank lines are ignored.
+#
+# Put here anything the model tends to get wrong: host and guest names, show
+# names, and English brand/tech terms that should keep their English spelling.
+# These bias the ASR (initial_prompt) and guide the LLM correction pass.
+
+# --- People / show names (examples) ---
+# דני לוי
+# שרה כהן
+
+# --- English brand / tech terms (examples) ---
+OBS
+vMix
+Dante
+NDI
+Behringer X32
+YouTube
+Twitch
+podcast
+livestream

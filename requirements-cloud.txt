@@ -1,0 +1,9 @@
+# Optional cloud engines — used only as a fallback when the local GPU is
+# saturated during a heavy recording/stream, or for best-in-class live
+# Hebrew-English code-switching. Install the one you choose; complete the
+# integration in studio_transcribe/engines/cloud.py. Keep API keys in the env
+# var named by config.cloud.api_key_env, never in source.
+
+# soniox>=1.6                 # best live Hebrew-English code-switching
+# elevenlabs>=1.10            # ElevenLabs Scribe
+# azure-cognitiveservices-speech>=1.40   # Azure Speech (he-IL)

@@ -1,0 +1,27 @@
+# Core runtime for the local (offline/archive) transcription pipeline.
+# The pure-stdlib core (models, normalize_he, eval_wer, merge, export, glossary,
+# config, CLI `eval`) needs NONE of these — they are only for actual ASR,
+# audio IO, and capture, which run on the studio node.
+
+# --- ASR (local, private, high accuracy) ---
+faster-whisper>=1.1.0          # CTranslate2 Whisper runtime (loads ivrit.ai CT2 model)
+numpy>=1.26
+
+# --- Audio IO ---
+soundfile>=0.12                # read/write WAV/FLAC (libsndfile)
+soxr>=0.5                      # high-quality resampling to 16 kHz (recommended)
+
+# --- Capture (Stage 0, Windows ASIO / Dante Virtual Soundcard) ---
+sounddevice>=0.4              # PortAudio; build/select the ASIO backend on Windows
+
+# --- Config ---
+pyyaml>=6.0
+
+# --- Export ---
+python-docx>=1.1             # DOCX export (speaker-labeled, RTL)
+
+# --- Optional: live VAD / streaming gating ---
+# torch>=2.2                  # required only for the standalone Silero VAD wrapper
+
+# --- Optional: gated LLM post-correction ---
+# anthropic>=0.40            # required only if llm_correction.enabled = true
