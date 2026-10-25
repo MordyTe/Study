@@ -50,6 +50,7 @@ studio_transcribe/        חבילת הפייתון
   engines/                מנועי ASR (faster-whisper מקומי, cloud scaffold)
   live/                   כתוביות חיות: capture_stream, soniox_client,
                           vad_gate, captions, sinks (OBS/vMix/file), runner
+  server/                 מסך תפעול: FastAPI (app/service/auth) + SPA ב‑static/
 capture/capture_asio.py   שלב 0: לכידת ערוצי X32 דרך ASIO ל‑WAV נפרד
 config/                   דוגמאות קונפיג + מילון
 tests/                    טסטים ל‑core הדטרמיניסטי (40 טסטים)
@@ -70,7 +71,18 @@ pip install -r requirements.txt
 מודל ivrit.ai יורד אוטומטית מ‑HuggingFace בריצה הראשונה. לזמן-אמת מקומי דרוש GPU של NVIDIA
 (מומלץ ≥12GB VRAM; 24GB נוח לכמה ערוצים במקביל).
 
-## שימוש
+## מסך תפעול (UI)
+
+```bash
+pip install -r requirements.txt
+studio-transcribe serve -c config/config.yaml          # ואז פתחו http://localhost:8000
+```
+
+מסך דפדפן להדלקה/כיבוי כתוביות חיות, הרצת תמלול, חיפוש בארכיון, והגדרות (ערוצים↔דוברים,
+יעד כתוביות OBS/vMix, מילון). לגישה מרשת: `host: 0.0.0.0` + `STUDIO_TRANSCRIBE_PASSWORD`.
+**המדריך המלא: [`docs/USAGE.md`](docs/USAGE.md).**
+
+## שימוש בשורת פקודה
 
 **שלב 0 — לכידת אודיו מה‑X32 (על החומרה):**
 
@@ -136,8 +148,8 @@ pip install pytest && python -m pytest        # 40 טסטים ל‑core
 - [x] שלב 1: צינור תמלול מדויק (offline) + ייצוא + מדידת WER
 - [x] שלב 2: אחסון SQLite (FTS5) + חיפוש full-text
 - [x] שלב 3: כתוביות חיות → Soniox (ענן) → OBS (obs-websocket) / vMix (API) / קובץ
-- [ ] שלב 4: מתג hybrid ענן בעומס + ניהול glossary ב‑UI
-- [ ] שלב 5: הקשחה, ניטור, התאוששות מכשל, UI ניטור
+- [x] שלב 4: מסך תפעול (FastAPI + UI) — הדלקה/כיבוי, תמלול, חיפוש, הגדרות, גישת LAN+סיסמה
+- [ ] שלב 5: הקשחה נוספת, ניטור מתקדם, מתג hybrid אוטומטי בעומס
 
 ## רישיון
 

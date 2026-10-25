@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>תמלול אולפן — מסך תפעול</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🎙️ תמלול אולפן</div>
+    <div class="top-right">
+      <span id="statusPill" class="pill off">לא פעיל</span>
+      <button id="logoutBtn" class="ghost" title="נתק">⎋</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="live">חי</button>
+    <button class="tab" data-tab="transcribe">תמלול</button>
+    <button class="tab" data-tab="archive">ארכיון</button>
+    <button class="tab" data-tab="settings">הגדרות</button>
+  </nav>
+
+  <main>
+    <!-- LIVE -->
+    <section id="live" class="panel active">
+      <div class="live-controls">
+        <button id="liveToggle" class="big-btn start">▶ הדלקת כתוביות חיות</button>
+        <div class="live-meta">
+          <div>מנוע: <b id="liveEngine">—</b></div>
+          <div>יעד כתוביות: <b id="liveSink">—</b></div>
+          <div>ערוצים פעילים: <b id="liveActive">—</b></div>
+        </div>
+      </div>
+      <div id="liveError" class="error hidden"></div>
+      <h3>כתוביות חיות</h3>
+      <div id="captions" class="captions"></div>
+    </section>
+
+    <!-- TRANSCRIBE -->
+    <section id="transcribe" class="panel">
+      <h3>תמלול הקלטה (מדויק, מקומי)</h3>
+      <label>נתיב קובץ רב-ערוצי או תיקיית ערוצים (על ה-node):</label>
+      <input id="trInput" type="text" placeholder="rec/  או  C:\\recordings\\show1.wav" />
+      <div class="formats">
+        <label><input type="checkbox" value="txt" checked /> TXT</label>
+        <label><input type="checkbox" value="srt" checked /> SRT</label>
+        <label><input type="checkbox" value="vtt" /> VTT</label>
+        <label><input type="checkbox" value="docx" /> DOCX</label>
+      </div>
+      <button id="trRun" class="btn">הרץ תמלול</button>
+      <div id="jobs" class="jobs"></div>
+    </section>
+
+    <!-- ARCHIVE -->
+    <section id="archive" class="panel">
+      <h3>חיפוש בארכיון</h3>
+      <div class="search-row">
+        <input id="searchQuery" type="text" placeholder="מה נאמר על…" />
+        <input id="searchSpeaker" type="text" placeholder="דובר (אופציונלי)" />
+        <button id="searchBtn" class="btn">חיפוש</button>
+      </div>
+      <div id="searchResults" class="results"></div>
+      <h3>הקלטות שמורות</h3>
+      <div id="sessions" class="results"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="settings" class="panel">
+      <h3>הגדרות</h3>
+      <div class="field"><label>מנוע תמלול (archive)</label>
+        <input id="setModel" type="text" /></div>
+      <div class="field"><label>מכשיר (device)</label>
+        <input id="setDevice" type="text" placeholder="auto | cuda | cpu" /></div>
+      <div class="field"><label>נתיב DB</label>
+        <input id="setDb" type="text" /></div>
+
+      <h4>ערוצים ↔ דוברים</h4>
+      <table class="chtable"><thead><tr><th>ערוץ</th><th>דובר</th><th>פעיל</th><th></th></tr></thead>
+        <tbody id="channelsBody"></tbody></table>
+      <button id="addChannel" class="ghost">+ הוסף ערוץ</button>
+
+      <h4>כתוביות חיות</h4>
+      <div class="field"><label>יעד (sink)</label>
+        <select id="setSink"><option>stdout</option><option>file</option><option>obs</option><option>vmix</option></select></div>
+      <div class="field"><label>OBS source / host:port</label>
+        <input id="setObsSource" type="text" placeholder="captions" />
+        <input id="setObsHost" type="text" placeholder="localhost" />
+        <input id="setObsPort" type="text" placeholder="4455" /></div>
+      <div class="field"><label>vMix url / input / field</label>
+        <input id="setVmixUrl" type="text" placeholder="http://127.0.0.1:8088/api/" />
+        <input id="setVmixInput" type="text" placeholder="input" />
+        <input id="setVmixField" type="text" placeholder="Headline.Text" /></div>
+      <div class="field"><label>קובץ כתוביות (sink=file)</label>
+        <input id="setFilePath" type="text" placeholder="captions.txt" /></div>
+
+      <h4>מילון (glossary)</h4>
+      <textarea id="glossary" rows="6" placeholder="שם לכל שורה…"></textarea>
+
+      <div class="actions">
+        <button id="saveSettings" class="btn">שמור הגדרות</button>
+        <span id="saveMsg" class="muted"></span>
+      </div>
+    </section>
+  </main>
+
+  <!-- login overlay -->
+  <div id="login" class="overlay hidden">
+    <div class="login-box">
+      <h3>כניסה</h3>
+      <p class="muted">הזן סיסמה כדי לגשת למסך התפעול.</p>
+      <input id="loginPassword" type="password" placeholder="סיסמה" />
+      <button id="loginBtn" class="btn">כניסה</button>
+      <div id="loginError" class="error hidden">סיסמה שגויה</div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

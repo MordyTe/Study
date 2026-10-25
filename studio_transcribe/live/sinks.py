@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Optional
+from typing import Callable, List, Optional
 
 from ..config import LiveConfig
 
@@ -22,6 +22,37 @@ class CaptionSink:
 
     def close(self) -> None:
         pass
+
+
+class CallbackSink(CaptionSink):
+    """Call an arbitrary function with each caption (e.g. push to the web UI)."""
+
+    def __init__(self, callback: Callable[[str], None]):
+        self._callback = callback
+
+    def emit(self, text: str) -> None:
+        self._callback(text)
+
+
+class MultiSink(CaptionSink):
+    """Fan a caption out to several sinks; one failing sink never blocks the rest."""
+
+    def __init__(self, sinks: List[CaptionSink]):
+        self._sinks = sinks
+
+    def emit(self, text: str) -> None:
+        for sink in self._sinks:
+            try:
+                sink.emit(text)
+            except Exception:
+                pass
+
+    def close(self) -> None:
+        for sink in self._sinks:
+            try:
+                sink.close()
+            except Exception:
+                pass
 
 
 class StdoutSink(CaptionSink):

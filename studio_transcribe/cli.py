@@ -101,6 +101,21 @@ def _cmd_live(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from .config import Config
+    from .server import create_app
+
+    config = Config.from_yaml(args.config) if args.config else Config.from_dict({})
+    host = args.host or config.server.host
+    port = args.port or config.server.port
+    app = create_app(config_path=args.config, out_dir=args.out_dir)
+    print(f"operator UI on http://{host}:{port}", file=sys.stderr)
+    uvicorn.run(app, host=host, port=port)
+    return 0
+
+
 def _cmd_version(_args: argparse.Namespace) -> int:
     from . import __version__
 
@@ -150,6 +165,13 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("reference", help="ground-truth transcript (text file)")
     e.add_argument("hypothesis", help="system output transcript (text file)")
     e.set_defaults(func=_cmd_eval)
+
+    sv = sub.add_parser("serve", help="run the operator web app (UI)")
+    sv.add_argument("-c", "--config", help="YAML config path")
+    sv.add_argument("--host", help="bind host (0.0.0.0 for LAN access)")
+    sv.add_argument("--port", type=int, help="bind port (default 8000)")
+    sv.add_argument("--out-dir", default="out", help="output directory for jobs")
+    sv.set_defaults(func=_cmd_serve)
 
     v = sub.add_parser("version", help="print version")
     v.set_defaults(func=_cmd_version)

@@ -7,7 +7,7 @@ Loadable from a dict (used in tests and programmatic use) or a YAML file
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Mapping, Optional
 
 
@@ -86,6 +86,15 @@ class LiveConfig:
 
 
 @dataclass
+class ServerConfig:
+    """Operator web app (Stage 4)."""
+
+    host: str = "127.0.0.1"  # set 0.0.0.0 to allow other machines on the LAN
+    port: int = 8000
+    password_env: str = "STUDIO_TRANSCRIBE_PASSWORD"
+
+
+@dataclass
 class Config:
     engine: str = "faster-whisper"
     model: str = "ivrit-ai/whisper-large-v3-turbo-ct2"
@@ -102,6 +111,7 @@ class Config:
     cloud: CloudConfig = field(default_factory=CloudConfig)
     llm_correction: LLMCorrectionConfig = field(default_factory=LLMCorrectionConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
+    server: ServerConfig = field(default_factory=ServerConfig)
 
     def speaker_map(self) -> Dict[int, str]:
         return {c.index: c.speaker for c in self.channels if c.speaker}
@@ -129,7 +139,19 @@ class Config:
             cloud=CloudConfig(**d.get("cloud", {})),
             llm_correction=LLMCorrectionConfig(**d.get("llm_correction", {})),
             live=LiveConfig(**d.get("live", {})),
+            server=ServerConfig(**d.get("server", {})),
         )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to a plain dict (nested dataclasses expanded)."""
+
+        return asdict(self)
+
+    def save_yaml(self, path: str) -> None:
+        import yaml  # lazy
+
+        with open(path, "w", encoding="utf-8") as handle:
+            yaml.safe_dump(self.to_dict(), handle, allow_unicode=True, sort_keys=False)
 
     @classmethod
     def from_yaml(cls, path: str) -> "Config":

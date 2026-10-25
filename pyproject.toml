@@ -19,6 +19,8 @@ dependencies = [
     "soxr>=0.5",
     "pyyaml>=6.0",
     "python-docx>=1.1",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -26,13 +28,21 @@ capture = ["sounddevice>=0.4"]
 vad = ["torch>=2.2"]
 llm = ["anthropic>=0.40"]
 live = ["sounddevice>=0.4", "websocket-client>=1.7", "obsws-python>=1.7", "requests>=2.31"]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "httpx>=0.27"]
 
 [project.scripts]
 studio-transcribe = "studio_transcribe.cli:main"
 
 [tool.setuptools]
-packages = ["studio_transcribe", "studio_transcribe.engines", "studio_transcribe.live"]
+packages = [
+    "studio_transcribe",
+    "studio_transcribe.engines",
+    "studio_transcribe.live",
+    "studio_transcribe.server",
+]
+
+[tool.setuptools.package-data]
+"studio_transcribe.server" = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

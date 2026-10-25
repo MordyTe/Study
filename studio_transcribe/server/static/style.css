@@ -1,0 +1,110 @@
+:root {
+  --bg: #0f1419;
+  --panel: #1a222c;
+  --panel2: #232d39;
+  --text: #e6edf3;
+  --muted: #8b98a5;
+  --accent: #3fb950;
+  --accent2: #388bfd;
+  --danger: #f85149;
+  --border: #2d3843;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.brand { font-size: 20px; font-weight: 700; }
+.top-right { display: flex; align-items: center; gap: 12px; }
+.pill {
+  padding: 4px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+}
+.pill.off { background: #3a2226; color: var(--danger); }
+.pill.on { background: #19361f; color: var(--accent); }
+.tabs { display: flex; gap: 4px; padding: 10px 20px 0; background: var(--panel); }
+.tab {
+  background: none; border: none; color: var(--muted); padding: 10px 18px;
+  font-size: 15px; cursor: pointer; border-bottom: 3px solid transparent;
+}
+.tab.active { color: var(--text); border-bottom-color: var(--accent2); }
+main { padding: 24px; max-width: 900px; margin: 0 auto; }
+.panel { display: none; }
+.panel.active { display: block; }
+h3 { margin: 18px 0 10px; }
+h4 { margin: 22px 0 8px; color: var(--muted); }
+
+.live-controls { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.big-btn {
+  font-size: 20px; font-weight: 700; padding: 22px 32px; border-radius: 12px;
+  border: none; cursor: pointer; color: #fff; min-width: 280px;
+}
+.big-btn.start { background: var(--accent); }
+.big-btn.stop { background: var(--danger); }
+.live-meta { display: grid; gap: 6px; color: var(--muted); font-size: 14px; }
+.live-meta b { color: var(--text); }
+.captions {
+  background: #000; border: 1px solid var(--border); border-radius: 10px;
+  min-height: 180px; padding: 18px; font-size: 26px; line-height: 1.5;
+  white-space: pre-wrap; direction: rtl;
+}
+
+input, select, textarea {
+  width: 100%; padding: 10px 12px; background: var(--panel2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px; font-size: 14px; margin: 4px 0;
+}
+.field { margin-bottom: 12px; }
+.field label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 2px; }
+.field input + input { margin-top: 6px; }
+.formats { display: flex; gap: 18px; margin: 10px 0; }
+.formats label { color: var(--text); }
+.formats input { width: auto; }
+
+.btn {
+  background: var(--accent2); color: #fff; border: none; padding: 10px 22px;
+  border-radius: 8px; font-size: 15px; cursor: pointer; margin-top: 8px;
+}
+.ghost {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  padding: 8px 16px; border-radius: 8px; cursor: pointer;
+}
+.actions { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+.muted { color: var(--muted); font-size: 13px; }
+.error { color: var(--danger); margin: 10px 0; }
+.hidden { display: none; }
+
+.search-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.search-row input { flex: 1; min-width: 160px; }
+.results { margin-top: 12px; }
+.result, .session {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 8px;
+}
+.result .meta, .session .meta { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+
+.jobs { margin-top: 16px; }
+.job {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; margin-bottom: 10px;
+}
+.job .st { font-weight: 600; }
+.job a { color: var(--accent2); margin-left: 12px; }
+
+.chtable { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.chtable th, .chtable td { border: 1px solid var(--border); padding: 6px 8px; text-align: right; }
+.chtable input { margin: 0; }
+.chtable input[type=number] { width: 70px; }
+
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+}
+.login-box {
+  background: var(--panel); padding: 30px; border-radius: 12px; width: 320px;
+  border: 1px solid var(--border);
+}
