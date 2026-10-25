@@ -43,6 +43,39 @@ def mix_down(data: np.ndarray) -> np.ndarray:
     return np.clip(data.sum(axis=1), -1.0, 1.0).astype(np.float32)
 
 
+def select_channels(data: np.ndarray, channels: List[int]) -> np.ndarray:
+    """Keep only the chosen channels (1-based numbers) of ``[frames, ch]`` audio.
+
+    Numbers beyond what the device has are ignored. Returns ``[frames, k]``.
+    """
+
+    data = np.asarray(data, dtype=np.float32)
+    if data.ndim == 1:
+        data = data[:, None]
+    idx = [c - 1 for c in channels if 1 <= c <= data.shape[1]]
+    return data[:, idx]
+
+
+def channel_levels(data: np.ndarray) -> List[float]:
+    """Meter value (see :func:`level`) for every channel of ``[frames, ch]`` audio."""
+
+    data = np.asarray(data, dtype=np.float32)
+    if data.ndim == 1:
+        data = data[:, None]
+    return [level(data[:, i]) for i in range(data.shape[1])]
+
+
+def channels_for(settings: dict, source: str, available: int) -> List[int]:
+    """The saved channel choice for a source, limited to what it has; default all."""
+
+    saved = (settings.get("channels") or {}).get(source)
+    if isinstance(saved, list):
+        valid = sorted({int(c) for c in saved if isinstance(c, int) and 1 <= c <= available})
+        if valid:
+            return valid
+    return list(range(1, available + 1))
+
+
 def level(signal: np.ndarray) -> float:
     """Loudness for the on-screen meter: 0.0 (silence) .. 1.0 (full scale),
     on a -60..0 dB scale so normal speech sits in the middle of the bar."""
@@ -153,8 +186,9 @@ class Chunker:
         return chunk if chunk.size else None
 
 
-def format_line(text: str, when: datetime) -> str:
-    return f"[{when:%H:%M:%S}] {text.strip()}"
+def format_line(text: str, when: datetime, speaker: Optional[str] = None) -> str:
+    prefix = f"{speaker}: " if speaker else ""
+    return f"[{when:%H:%M:%S}] {prefix}{text.strip()}"
 
 
 def new_transcript_path(folder: str, now: datetime) -> str:

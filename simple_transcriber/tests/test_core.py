@@ -11,6 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core import (  # noqa: E402
     TARGET_SR,
     Chunker,
+    channel_levels,
+    channels_for,
     TranscriptWriter,
     format_line,
     level,
@@ -19,6 +21,7 @@ from core import (  # noqa: E402
     new_transcript_path,
     resample,
     save_settings,
+    select_channels,
     to_mono,
 )
 
@@ -134,3 +137,29 @@ def test_settings_roundtrip_and_corrupt_file(tmp_path):
     with open(p, "w", encoding="utf-8") as f:
         f.write("{not json")
     assert load_settings(p) == {}  # corrupt -> defaults, no crash
+
+
+def test_select_channels_picks_1_based_and_ignores_out_of_range():
+    data = np.arange(12, dtype=np.float32).reshape(3, 4)  # 4 channels
+    out = select_channels(data, [2, 4, 9])
+    assert out.shape == (3, 2)
+    assert np.allclose(out[:, 0], data[:, 1]) and np.allclose(out[:, 1], data[:, 3])
+
+
+def test_channel_levels_per_channel():
+    data = np.zeros((1000, 3), np.float32)
+    data[:, 1] = 0.2
+    lv = channel_levels(data)
+    assert lv[0] == 0.0 and lv[2] == 0.0 and lv[1] > 0.5
+
+
+def test_channels_for_defaults_and_saved_choice():
+    assert channels_for({}, "mixer", 4) == [1, 2, 3, 4]
+    s = {"channels": {"mixer": [3, 1, 99]}}
+    assert channels_for(s, "mixer", 32) == [1, 3]       # 99 dropped, sorted
+    assert channels_for(s, "other", 2) == [1, 2]        # other device -> all
+    assert channels_for({"channels": {"m": [7]}}, "m", 2) == [1, 2]  # nothing valid -> all
+
+
+def test_format_line_with_speaker():
+    assert format_line("שלום", datetime(2026, 1, 1, 9, 5, 7), "ערוץ 3") == "[09:05:07] ערוץ 3: שלום"
