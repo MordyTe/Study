@@ -32,3 +32,4 @@ rec/
 simple_transcriber/transcripts/
 simple_transcriber/settings.json
 simple_transcriber/*.log
+simple_transcriber/glossary.txt

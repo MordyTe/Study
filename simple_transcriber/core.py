@@ -222,3 +222,185 @@ def load_settings(path: str) -> dict:
 def save_settings(path: str, settings: dict) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(settings, handle, ensure_ascii=False, indent=2)
+
+
+# --- input devices ------------------------------------------------------------
+
+# Inputs that are really the *speakers* (they record what the computer plays).
+_LOOPBACK_WORDS = (
+    "stereo mix", "what u hear", "wave out", "loopback", "mix stereo",
+    "מיקס סטריאו",   # מיקס סטריאו
+    "סטריאו מיקס",   # סטריאו מיקס
+)
+# Virtual "mapper" entries that are not real devices.
+_VIRTUAL_WORDS = ("sound mapper", "primary sound capture")
+
+
+def is_loopback_name(name: str) -> bool:
+    low = name.lower()
+    return any(w in low for w in _LOOPBACK_WORDS)
+
+
+def _api_short(api_name: str) -> Optional[str]:
+    low = api_name.lower()
+    if "asio" in low:
+        return "ASIO"
+    if "wasapi" in low:
+        return "WASAPI"
+    if low == "mme":
+        return "MME"
+    return None  # DirectSound / WDM-KS: duplicates of the same hardware
+
+
+def build_device_list(devices: List[dict], hostapis: List[dict]) -> List[dict]:
+    """Turn PortAudio's raw device list into the list shown to the user.
+
+    * only real inputs (no speaker-loopback "Stereo Mix", no virtual mappers);
+    * ASIO first (all channels of a pro card), then WASAPI, and MME only for
+      devices that have no WASAPI entry (MME repeats the same hardware with
+      names cut to 31 characters);
+    * each entry: key (stable across reboots), label, index, channels,
+      samplerate, api.
+    """
+
+    entries: List[dict] = []
+    wasapi_names: List[str] = []
+    for dev in devices:
+        if dev.get("max_input_channels", 0) <= 0:
+            continue
+        api = _api_short(hostapis[dev["hostapi"]]["name"])
+        if api is None:
+            continue
+        name = str(dev["name"]).strip()
+        low = name.lower()
+        if is_loopback_name(name) or any(w in low for w in _VIRTUAL_WORDS):
+            continue
+        if api == "WASAPI":
+            wasapi_names.append(low)
+        entries.append(
+            {
+                "key": f"{api}|{name}",
+                "label": f"{name}   [{api} · {dev['max_input_channels']} ערוצים]",
+                "index": dev["index"],
+                "channels": int(dev["max_input_channels"]),
+                "samplerate": int(dev.get("default_samplerate") or 48000),
+                "api": api,
+            }
+        )
+
+    def mme_duplicate(e: dict) -> bool:
+        short = e["key"].split("|", 1)[1].lower()
+        return e["api"] == "MME" and any(w.startswith(short[:31]) for w in wasapi_names)
+
+    entries = [e for e in entries if not mme_duplicate(e)]
+    order = {"ASIO": 0, "WASAPI": 1, "MME": 2}
+    entries.sort(key=lambda e: order[e["api"]])
+    return entries
+
+
+def pick_default(entries: List[dict], saved_key: Optional[str], hostapis: List[dict]) -> Optional[dict]:
+    """Saved choice if still present, else Windows' default input, else the first."""
+
+    if not entries:
+        return None
+    for e in entries:
+        if e["key"] == saved_key:
+            return e
+    for api in hostapis:
+        if _api_short(api.get("name", "")) == "WASAPI":
+            for e in entries:
+                if e["index"] == api.get("default_input_device"):
+                    return e
+    return entries[0]
+
+
+# --- transcription quality ------------------------------------------------------
+
+# Phrases Whisper is known to *invent* on silence / noise (learned from subtitles).
+_HALLUCINATIONS = {
+    "תודה שצפיתם",            # תודה שצפיתם
+    "תודה על הצפייה",  # תודה על הצפייה
+    "תודה לצפייה",            # תודה לצפייה
+    "תודה רבה",                        # תודה רבה
+    "תודה",                                    # תודה
+    "כתוביות",                          # כתוביות
+    "תרגום כתוביות",    # תרגום כתוביות
+    "תורגם על ידי",            # תורגם על ידי
+    "thanks for watching", "thank you for watching", "thank you",
+    "subtitles by the amara org community", "amara org",
+}
+
+
+def _norm(text: str) -> str:
+    out = []
+    for ch in text.lower():
+        out.append(ch if (ch.isalnum() or ch.isspace()) else " ")
+    return " ".join("".join(out).split())
+
+
+def is_hallucination_phrase(text: str) -> bool:
+    return _norm(text) in _HALLUCINATIONS
+
+
+def keep_segment(
+    text: str,
+    avg_logprob: float = 0.0,
+    no_speech_prob: float = 0.0,
+    compression_ratio: float = 1.0,
+) -> bool:
+    """Drop segments that are most likely invented rather than heard."""
+
+    if not _norm(text):
+        return False  # punctuation / music notes only
+    if compression_ratio > 2.4:
+        return False  # repetition loop
+    if avg_logprob < -1.0:
+        return False  # the model itself is very unsure
+    if no_speech_prob > 0.6 and avg_logprob < -0.5:
+        return False  # probably silence/noise
+    if is_hallucination_phrase(text) and (no_speech_prob > 0.2 or avg_logprob < -0.4):
+        return False  # classic subtitle hallucination, not confidently heard
+    return True
+
+
+def collapse_repeats(text: str, max_repeats: int = 3) -> str:
+    """Collapse a word or short phrase repeated more than ``max_repeats`` times in
+    a row (a Whisper loop) to a single occurrence. "לא לא לא" stays as is."""
+
+    words = text.split()
+    for n in (3, 2, 1):
+        i, out = 0, []
+        while i < len(words):
+            gram = words[i : i + n]
+            reps = 1
+            while words[i + reps * n : i + (reps + 1) * n] == gram and len(gram) == n:
+                reps += 1
+            if reps > max_repeats:
+                out.extend(gram)
+                i += reps * n
+            else:
+                out.append(words[i])
+                i += 1
+        words = out
+    return " ".join(words)
+
+
+def normalize_gain(chunk: np.ndarray, target_peak: float = 0.6, max_gain: float = 8.0) -> np.ndarray:
+    """Boost quiet microphones so the model gets a healthy level (never attenuates)."""
+
+    chunk = np.asarray(chunk, dtype=np.float32)
+    peak = float(np.max(np.abs(chunk))) if chunk.size else 0.0
+    if peak < 1e-4:
+        return chunk
+    gain = min(max_gain, target_peak / peak)
+    return chunk * gain if gain > 1.0 else chunk
+
+
+def load_glossary(path: str) -> List[str]:
+    """Names / terms (one per line) that the model should prefer. Optional file."""
+
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return [l.strip() for l in handle if l.strip() and not l.lstrip().startswith("#")]
+    except OSError:
+        return []
