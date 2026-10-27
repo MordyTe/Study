@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מקור — המשרד</title>
+<style>
+:root{--bg:#0f1419;--panel:#1a222c;--panel2:#232d39;--text:#e6edf3;--muted:#8b98a5;--border:#2d3843;
+--green:#3fb950;--blue:#388bfd;--red:#f85149;--yellow:#d29922;--purple:#a371f7;--teal:#39c5bb;--orange:#f0883e;--pink:#db61a2}
+*{box-sizing:border-box}body{margin:0;font-family:"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.brand{font-size:20px;font-weight:700}.brand small{color:var(--muted);font-weight:400;margin-right:8px}
+.stage{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.stage .bar{width:160px;height:8px;background:#0d1117;border-radius:6px;overflow:hidden}.stage .bar i{display:block;height:100%;background:var(--green)}
+select,button{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:14px;cursor:pointer}
+nav{display:flex;gap:2px;padding:6px 14px 0;background:var(--panel);flex-wrap:wrap}
+nav button{background:none;border:none;border-bottom:3px solid transparent;color:var(--muted);padding:8px 14px;border-radius:0}
+nav button.on{color:var(--text);border-bottom-color:var(--blue)}
+main{padding:16px;max-width:1240px;margin:0 auto}.tab{display:none}.tab.on{display:block}
+.office-wrap{display:grid;grid-template-columns:1fr 320px;gap:14px}@media(max-width:900px){.office-wrap{grid-template-columns:1fr}}
+svg.map{width:100%;height:auto;background:#111820;border:1px solid var(--border);border-radius:12px}
+.room rect{fill:#182029;stroke:#2d3843;stroke-width:2;rx:10}.room text.lbl{fill:#8b98a5;font-size:13px}
+.room.meeting rect{stroke:#388bfd;cursor:pointer}.room.meeting:hover rect{fill:#1c2a3d}
+.agent{cursor:pointer}.agent circle{stroke:#0f1419;stroke-width:2}.agent text.ini{fill:#fff;font-size:12px;font-weight:700;text-anchor:middle}
+.agent text.nm{fill:#e6edf3;font-size:11px;text-anchor:middle}.agent.fired circle{opacity:.25}.agent.fired text{opacity:.4}
+.bubble{fill:#0d1117;stroke:#2d3843}.bubble-t{fill:#9da7b3;font-size:10px}
+.side{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;min-height:300px}
+.side h3{margin:0 0 6px}.muted{color:var(--muted);font-size:13px}.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;background:#0d1117;margin:2px}
+.score{font-size:28px;font-weight:700}
+.turn{display:flex;gap:10px;margin:8px 0;align-items:flex-start;opacity:0;transform:translateY(6px);transition:all .35s}.turn.show{opacity:1;transform:none}
+.turn .av{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
+.turn .tx{background:#0d1117;border:1px solid var(--border);border-radius:12px;padding:8px 12px;max-width:100%}.turn .tx b{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+.transcript{max-height:420px;overflow:auto;padding-left:4px}
+.kanban{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}@media(max-width:900px){.kanban{grid-template-columns:1fr 1fr}}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px;min-height:120px}.col h4{margin:4px 6px 8px;color:var(--muted);font-size:13px}
+.card{background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:13px}.card .t{font-weight:600;margin-bottom:4px}
+.card .ev{color:var(--muted);font-size:12px;word-break:break-all}.flag{color:var(--red);font-weight:700}
+.list{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 14px}.list .row{padding:8px 0;border-bottom:1px solid var(--border)}.list .row:last-child{border:none}
+.tree{display:flex;flex-direction:column;align-items:center;gap:18px}.tier{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.node{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 12px;min-width:150px;text-align:center;border-top:4px solid var(--blue)}
+.node .r{color:var(--muted);font-size:12px}.node .s{font-size:12px;margin-top:4px}
+.report{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 18px;line-height:1.6}.report h1{font-size:20px}.report h2{font-size:16px;color:var(--muted)}
+canvas.spark{background:#0d1117;border-radius:6px}
+.gate{padding:6px 0;border-bottom:1px solid var(--border)}.gate.done{color:var(--green)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">🏢 מקור <small>חברת AI אוטונומית</small></div>
+  <div class="stage"><span id="stageText"></span><div class="bar"><i id="stageBar"></i></div></div>
+  <div><label class="muted">יום: </label><select id="daySel"></select> <span id="phase" class="pill"></span></div>
+</header>
+<nav>
+  <button class="on" data-t="office">המשרד</button><button data-t="org">ארגונומה</button><button data-t="tasks">משימות</button>
+  <button data-t="metrics">מדדים</button><button data-t="hr">כוח אדם</button><button data-t="decisions">החלטות</button><button data-t="reports">דוחות</button>
+</nav>
+<main>
+  <section id="office" class="tab on">
+    <div class="office-wrap">
+      <svg class="map" id="map" viewBox="0 0 1000 720"></svg>
+      <aside class="side" id="side"><h3>המשרד</h3><div class="muted">לחצו על דמות לפרטים, או על חדר הישיבות כדי לצפות בישיבה של היום.</div></aside>
+    </div>
+  </section>
+  <section id="org" class="tab"><div class="tree" id="tree"></div></section>
+  <section id="tasks" class="tab"><div class="kanban" id="kanban"></div></section>
+  <section id="metrics" class="tab"><div class="list" id="gates"></div><br><div class="list" id="metricsList"></div></section>
+  <section id="hr" class="tab"><div class="list" id="hrList"></div></section>
+  <section id="decisions" class="tab"><h3>צריך את ההחלטה שלך</h3><div class="list" id="inboxList"></div><h3>יומן החלטות</h3><div class="list" id="decList"></div></section>
+  <section id="reports" class="tab"><div id="reportsList"></div></section>
+</main>
+<script src="data.js"></script>
+<script>
+"use strict";
+const D = window.MAKOR_DATA || {agents:[],tasks:[],meetings:[],hr:[],inbox:[],decisions:[],metrics:[],reports:[],day:{day:0,stage:0},stage_gates:[],summary:{}};
+const DEPT_COLOR={exec:"#a371f7",ops:"#388bfd",product:"#39c5bb",tech:"#3fb950",marketing:"#f0883e",qa:"#d29922",hr:"#db61a2",research:"#39c5bb"};
+const ROOMS={ceo:{x:740,y:20,w:240,h:200,label:"חדר המנכ\"ל"},meeting:{x:300,y:20,w:420,h:200,label:"חדר ישיבות"},
+ ops:{x:20,y:20,w:260,h:200,label:"תפעול"},dev:{x:20,y:240,w:480,h:280,label:"קומת פיתוח"},product:{x:520,y:240,w:460,h:130,label:"מוצר ומחקר"},
+ marketing:{x:520,y:390,w:220,h:130,label:"שיווק"},qa:{x:760,y:390,w:220,h:130,label:"QA"},hr:{x:20,y:540,w:960,h:160,label:"HR ובקרה"}};
+const esc=s=>String(s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const agentById=id=>D.agents.find(a=>a.id===id);
+const name=id=>(agentById(id)||{}).name||id;
+let curDay=D.day.day;
+
+/* ---------- header ---------- */
+(function(){const g=D.stage_gates.length||1,s=D.day.stage||0;
+ document.getElementById("stageText").textContent=`שער ${Math.min(s+1,g)}/${g}: ${D.stage_gates[Math.min(s,g-1)]||""}`;
+ document.getElementById("stageBar").style.width=Math.round(100*s/g)+"%";
+ document.getElementById("phase").textContent={morning:"ישיבת בוקר",work:"עבודה",review:"בדיקה",report:"דוח",closed:"יום נסגר",founded:"נוסדה"}[D.day.phase]||D.day.phase||"";
+ const days=[...new Set([...D.meetings.map(m=>m.day),...D.tasks.map(t=>t.day),...D.reports.map(r=>r.day),D.day.day])].sort((a,b)=>b-a);
+ const sel=document.getElementById("daySel");days.forEach(d=>{const o=document.createElement("option");o.value=d;o.textContent="יום "+d;sel.appendChild(o)});
+ sel.value=curDay;sel.onchange=()=>{curDay=+sel.value;renderAll()};})();
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
+ document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));b.classList.add("on");document.getElementById(b.dataset.t).classList.add("on")});
+
+/* ---------- office map ---------- */
+function renderMap(){const svg=document.getElementById("map");let h="";
+ for(const [k,r] of Object.entries(ROOMS)){h+=`<g class="room ${k}" data-room="${k}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/><text class="lbl" x="${r.x+r.w-10}" y="${r.y+18}" text-anchor="end">${r.label}</text></g>`;}
+ const byRoom={};D.agents.forEach(a=>{const rm=ROOMS[a.room]?a.room:"dev";(byRoom[rm]=byRoom[rm]||[]).push(a)});
+ for(const [rm,list] of Object.entries(byRoom)){const r=ROOMS[rm];const perRow=Math.max(1,Math.floor((r.w-20)/100));
+  list.forEach((a,i)=>{const cx=r.x+r.w-55-(i%perRow)*100,cy=r.y+66+Math.floor(i/perRow)*84;const col=DEPT_COLOR[a.dept]||"#8b98a5";
+   const act=(a.activity||"").slice(0,22);const fired=a.status!=="active";
+   h+=`<g class="agent ${fired?"fired":""}" data-id="${a.id}">`;
+   if(!fired&&act){h+=`<rect class="bubble" x="${cx-60}" y="${cy-48}" width="120" height="18" rx="9"/><text class="bubble-t" x="${cx}" y="${cy-35}" text-anchor="middle">${esc(act)}</text>`;}
+   h+=`<circle cx="${cx}" cy="${cy}" r="16" fill="${col}"/><text class="ini" x="${cx}" y="${cy+4}">${esc((a.name||"?").slice(0,2))}</text><text class="nm" x="${cx}" y="${cy+30}">${esc(a.name)}</text></g>`;});}
+ svg.innerHTML=h;
+ svg.querySelectorAll(".agent").forEach(g=>g.onclick=()=>showAgent(g.dataset.id));
+ svg.querySelector(".room.meeting").onclick=()=>showMeeting();}
+function showAgent(id){const a=agentById(id);const mine=D.tasks.filter(t=>t.owner===id).slice(-6).reverse();
+ const hist=(a.scores||[]).slice(-8).map(s=>s.score).join(" · ")||"—";
+ document.getElementById("side").innerHTML=`<h3>${esc(a.name)} <span class="pill" style="background:${DEPT_COLOR[a.dept]||'#444'}">${esc(a.role)}</span></h3>
+ <div class="muted">${a.status==="active"?"פעיל/ה":"פוטר/ה ביום "+a.fired_day} · גויס/ה ביום ${a.hired_day}</div>
+ <p>${esc(a.persona||"")}</p><div class="score">${a.avg??"—"}<span class="muted" style="font-size:13px"> ציון (3 ימים)</span></div><div class="muted">היסטוריה: ${hist}</div>
+ <h4>משימות אחרונות</h4>${mine.map(t=>`<div class="card"><div class="t">${{done:"✅",failed:"❌"}[t.status]||"⏳"} ${esc(t.title)}</div><div class="ev">${esc(t.verify?t.verify.detail:t.status)}</div></div>`).join("")||"<div class='muted'>אין</div>"}`;}
+let player=null;
+function showMeeting(){const m=[...D.meetings].reverse().find(x=>x.day===curDay)||D.meetings[D.meetings.length-1];const side=document.getElementById("side");
+ if(!m){side.innerHTML="<h3>חדר ישיבות</h3><div class='muted'>אין ישיבה ליום הזה.</div>";return;}
+ side.innerHTML=`<h3>${esc(m.title)} <span class="muted">יום ${m.day}</span></h3><div class="muted">${m.participants.map(name).map(esc).join(" · ")}</div>
+ <div style="margin:8px 0"><button id="play">▶ נגן</button> <button id="all">הצג הכל</button> <select id="speed"><option value="1800">איטי</option><option value="1100" selected>רגיל</option><option value="500">מהיר</option></select></div>
+ <div class="transcript" id="tr"></div>${(m.decisions||[]).length?`<h4>החלטות</h4><ul>${m.decisions.map(d=>`<li>${esc(d)}</li>`).join("")}</ul>`:""}`;
+ const tr=document.getElementById("tr");tr.innerHTML=m.turns.map(t=>{const a=agentById(t.speaker)||{name:t.speaker,dept:"exec"};
+  return `<div class="turn"><div class="av" style="background:${DEPT_COLOR[a.dept]||'#444'}">${esc((a.name||"?").slice(0,2))}</div><div class="tx"><b>${esc(a.name)}</b>${esc(t.text)}</div></div>`}).join("");
+ const turns=[...tr.querySelectorAll(".turn")];clearInterval(player);let i=0;
+ const step=()=>{if(i>=turns.length){clearInterval(player);return;}turns[i].classList.add("show");turns[i].scrollIntoView({block:"nearest"});i++;};
+ document.getElementById("play").onclick=()=>{clearInterval(player);turns.forEach(t=>t.classList.remove("show"));i=0;step();player=setInterval(step,+document.getElementById("speed").value)};
+ document.getElementById("all").onclick=()=>{clearInterval(player);turns.forEach(t=>t.classList.add("show"))};}
+
+/* ---------- org chart ---------- */
+function renderOrg(){const tiers=[["executive"],["manager"],["worker"]];const el=document.getElementById("tree");
+ el.innerHTML=tiers.map(lv=>`<div class="tier">${D.agents.filter(a=>lv.includes(a.level)&&a.status==="active").map(a=>{const avg=a.avg;const c=avg==null?"#8b98a5":avg>=7?"#3fb950":avg>=5?"#d29922":"#f85149";
+  return `<div class="node" style="border-top-color:${DEPT_COLOR[a.dept]||'#444'}"><div><b>${esc(a.name)}</b></div><div class="r">${esc(a.role)}</div><div class="s" style="color:${c}">ציון: ${avg??"—"}</div></div>`}).join("")||"<div class='muted'>—</div>"}</div>`).join("");}
+
+/* ---------- tasks ---------- */
+function renderTasks(){const cols=[["todo","לביצוע"],["in_progress","בעבודה"],["review","בבדיקה"],["done","בוצע ✅"],["failed","נכשל ❌"]];
+ const ts=D.tasks.filter(t=>t.day===curDay);
+ document.getElementById("kanban").innerHTML=cols.map(([s,l])=>`<div class="col"><h4>${l} (${ts.filter(t=>t.status===s).length})</h4>${ts.filter(t=>t.status===s).map(t=>{
+  const noEv=t.status==="done"&&!t.evidence;return `<div class="card"><div class="t">${esc(t.title)}</div><div class="muted">${esc(name(t.owner||"—"))} · ${esc(t.dept)}</div>
+  ${t.evidence?`<div class="ev">הוכחה: ${esc(t.evidence)}</div>`:""}${t.verify?`<div class="ev">${esc(t.verify.detail)}</div>`:""}${t.qa?`<div class="ev">QA: ${t.qa.passed?"עבר":"נכשל"} ${esc(t.qa.notes||"")}</div>`:""}${noEv?`<div class="flag">⚠ בוצע בלי הוכחה</div>`:""}</div>`}).join("")}</div>`).join("");}
+
+/* ---------- metrics ---------- */
+function renderMetrics(){document.getElementById("gates").innerHTML="<h3 style='margin-top:0'>שערי שלב</h3>"+D.stage_gates.map((g,i)=>`<div class="gate ${i<(D.day.stage||0)?"done":""}">${i<(D.day.stage||0)?"✅":"⬜"} ${i+1}. ${esc(g)}</div>`).join("");
+ const keys=[...new Set(D.metrics.map(m=>m.key))];const el=document.getElementById("metricsList");
+ el.innerHTML="<h3 style='margin-top:0'>מדדים</h3>"+(keys.map(k=>{const pts=D.metrics.filter(m=>m.key===k);const last=pts[pts.length-1];
+  return `<div class="row"><b>${esc(k)}</b>: ${last.value} <span class="muted">(יום ${last.day})</span> <canvas class="spark" data-k="${esc(k)}" width="160" height="30"></canvas></div>`}).join("")||"<div class='muted'>עדיין אין מדדים.</div>");
+ el.querySelectorAll("canvas").forEach(c=>{const pts=D.metrics.filter(m=>m.key===c.dataset.k).map(m=>m.value);const ctx=c.getContext("2d");const max=Math.max(...pts,1);
+  ctx.strokeStyle="#3fb950";ctx.beginPath();pts.forEach((v,i)=>{const x=pts.length>1?i/(pts.length-1)*150+5:80,y=28-v/max*24;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();});}
+
+/* ---------- hr / decisions / reports ---------- */
+function renderHR(){document.getElementById("hrList").innerHTML=[...D.hr].reverse().map(h=>`<div class="row">${h.event==="hired"?"🟢 גויס/ה":"🔴 פוטר/ה"} <b>${esc(h.name)}</b> (${esc(h.role)}) — ${esc(h.reason)} <span class="muted">· יום ${h.day}</span></div>`).join("")||"<div class='muted'>אין אירועים.</div>";}
+function renderDecisions(){document.getElementById("inboxList").innerHTML=D.inbox.filter(q=>q.status==="open").map(q=>`<div class="row">❓ <b>${esc(q.question)}</b><div class="muted">${esc(q.context||"")} · יום ${q.day} · ${q.id}</div></div>`).join("")||"<div class='muted'>אין שאלות פתוחות.</div>";
+ const answered=D.inbox.filter(q=>q.status!=="open").map(q=>`<div class="row">✅ ${esc(q.question)} → <b>${esc(q.answer)}</b></div>`).join("");
+ document.getElementById("decList").innerHTML=answered+[...D.decisions].reverse().map(d=>`<div class="row">${d.kind==="alert"?"⚠️":"•"} ${esc(d.text)} <span class="muted">· יום ${d.day} · ${esc(d.by||"")}</span></div>`).join("")||"<div class='muted'>—</div>";}
+function md(t){return esc(t).replace(/^### (.*)$/gm,"<h3>$1</h3>").replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/^# (.*)$/gm,"<h1>$1</h1>").replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\*(.+?)\*/g,"<i>$1</i>").replace(/`(.+?)`/g,"<code>$1</code>").replace(/^- (.*)$/gm,"<li>$1</li>").replace(/\n\n/g,"<br><br>");}
+function renderReports(){const el=document.getElementById("reportsList");const rs=[...D.reports].sort((a,b)=>b.day-a.day);
+ el.innerHTML=rs.map(r=>`<div class="report" style="margin-bottom:14px">${md(r.text)}</div>`).join("")||"<div class='muted'>עדיין אין דוחות.</div>";}
+
+function renderAll(){renderMap();renderOrg();renderTasks();renderMetrics();renderHR();renderDecisions();renderReports();}
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+[
+  {
+    "day": 0,
+    "event": "hired",
+    "agent": "agt-ceo",
+    "name": "דוויין",
+    "role": "מנכ\"ל",
+    "reason": "ייסוד החברה",
+    "ts": "2026-10-27T18:21:43Z"
+  },
+  {
+    "day": 0,
+    "event": "hired",
+    "agent": "agt-coo",
+    "name": "נועה",
+    "role": "סמנכ\"לית תפעול",
+    "reason": "ייסוד החברה",
+    "ts": "2026-10-27T18:21:43Z"
+  },
+  {
+    "day": 0,
+    "event": "hired",
+    "agent": "agt-sup",
+    "name": "אלון",
+    "role": "המפקח",
+    "reason": "ייסוד החברה",
+    "ts": "2026-10-27T18:21:43Z"
+  },
+  {
+    "day": 0,
+    "event": "hired",
+    "agent": "agt-cto",
+    "name": "יובל",
+    "role": "מנהל טכנולוגיה",
+    "reason": "ייסוד החברה",
+    "ts": "2026-10-27T18:21:43Z"
+  },
+  {
+    "day": 0,
+    "event": "hired",
+    "agent": "agt-cpo",
+    "name": "מאיה",
+    "role": "מנהלת מוצר ומחקר",
+    "reason": "ייסוד החברה",
+    "ts": "2026-10-27T18:21:43Z"
+  },
+  {
+    "day": 0,
+    "event": "hired",
+    "agent": "agt-mkt",
+    "name": "עומר",
+    "role": "מנהל שיווק",
+    "reason": "ייסוד החברה",
+    "ts": "2026-10-27T18:21:43Z"
+  },
+  {
+    "day": 0,
+    "event": "hired",
+    "agent": "agt-qa",
+    "name": "תמר",
+    "role": "בודקת QA",
+    "reason": "ייסוד החברה",
+    "ts": "2026-10-27T18:21:43Z"
+  }
+]
