@@ -81,7 +81,13 @@
     "status": "active",
     "hired_day": 0,
     "fired_day": null,
-    "scores": []
+    "scores": [
+      {
+        "day": 0,
+        "task": "task-793bad",
+        "score": 8
+      }
+    ]
   },
   {
     "id": "agt-dev1",
@@ -93,7 +99,13 @@
     "status": "active",
     "hired_day": 0,
     "fired_day": null,
-    "scores": []
+    "scores": [
+      {
+        "day": 0,
+        "task": "task-99f163",
+        "score": 8
+      }
+    ]
   },
   {
     "id": "agt-dev2",
@@ -105,7 +117,13 @@
     "status": "active",
     "hired_day": 0,
     "fired_day": null,
-    "scores": []
+    "scores": [
+      {
+        "day": 0,
+        "task": "task-e91b90",
+        "score": 8
+      }
+    ]
   },
   {
     "id": "agt-res1",
@@ -117,7 +135,18 @@
     "status": "active",
     "hired_day": 0,
     "fired_day": null,
-    "scores": []
+    "scores": [
+      {
+        "day": 0,
+        "task": "task-ea1c3b",
+        "score": 8
+      },
+      {
+        "day": 0,
+        "task": "task-c204b7",
+        "score": 8
+      }
+    ]
   },
   {
     "id": "agt-wr1",
@@ -129,6 +158,12 @@
     "status": "active",
     "hired_day": 0,
     "fired_day": null,
-    "scores": []
+    "scores": [
+      {
+        "day": 0,
+        "task": "task-e15ab3",
+        "score": 8
+      }
+    ]
   }
 ]

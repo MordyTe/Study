@@ -7,5 +7,14 @@
     "status": "open",
     "answer": null,
     "ts": "2026-10-27T18:29:32Z"
+  },
+  {
+    "id": "q-ce5ba3",
+    "day": 0,
+    "question": "לבדוק זמינות ולרכוש דומיין (מומלץ: makor.tools או makordata.com; גיבוי makor-data.com) — בדיקה ב-lookup.icann.org",
+    "context": "הסוכנים לא יכולים לבדוק זמינות מהסנדבוקס (RDAP חסום). עלות ~$10–15/שנה. לא דחוף לפני פרסום הכלי הראשון.",
+    "status": "open",
+    "answer": null,
+    "ts": "2026-10-27T18:49:53Z"
   }
 ]

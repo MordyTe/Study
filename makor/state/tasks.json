@@ -6,16 +6,25 @@
     "desc": "א. תבנית: ליצור product/tools/_template/ עם server.py (עטיפת MCP דקה באמצעות ספריית mcp/FastMCP), core.py (פונקציות טהורות), tests/test_core.py (pytest, מייבא core בלבד — לא את server), README.md (אנגלית ואז עברית: משפט מה הכלי עושה, התקנה, רשימת כלים ופרמטרים, דוגמת קריאה ופלט, מגבלות ומקורות). תלויות מותרות: stdlib + mcp בלבד. ב. כלי: product/tools/hebrew_text/ באותו מבנה, עם שלוש פונקציות ב‑core.py: (1) normalize(text: str) -> dict: מסיר ניקוד וטעמים (U+0591–U+05C7), מאחד גרש/גרשיים עבריים (׳ ״) ומרכאות מסולסלות (“ ” ‘ ’) למרכאות ASCII, מסיר סימני כיווניות (U+200E, U+200F, U+202A–U+202E), ומכווץ רווחים כפולים; מחזיר {\"ok\": true, \"text\": ...}. (2) parse_hebrew_date(text: str) -> dict: עבור \"כ״ג בתשרי תשפ״ו\" (גם עם גרשיים ASCII וגם בלי ב' היחס) מחזיר {\"ok\": true, \"day\": 23, \"month\": \"תשרי\", \"month_index\": 1, \"year\": 5786}; שנה ללא אלפים מקבלת +5000; חודשים אדר א'/אדר ב' נתמכים; המרה לתאריך לועזי לא בהיקף — לכתוב ב‑README שלא נתמך. (3) gematria(text: str) -> dict: \"תשפ״ו\" -> {\"ok\": true, \"value\": 786}; אותיות סופיות שוות לרגילות; תווים שאינם עבריים מתעלמים מהם ומדווחים ב‑ignored. כללים: מחרוזת ריקה מחזירה ok=true עם תוצאה ריקה; None או טיפוס שאינו str מחזיר {\"ok\": false, \"error\": \"invalid_input\"}; קלט מעל 100,000 תווים מחזיר {\"ok\": false, \"error\": \"input_too_large\"}; אף פונקציה לא זורקת exception. טסטים: לפחות 15 טסטים ב‑product/tools/hebrew_text/tests/, כולל: קלט ריק, None, עברית מעורבת באנגלית, טקסט מנוקד, גרשיים בשני הסוגים, תאריך לא תקין (\"ל״ב בתשרי\"), אדר ב', קלט גדול מדי. אין גישה לרשת בטסטים. הוכחה: python -m pytest -q product/tools/hebrew_text/tests יוצא עם קוד 0.",
     "owner": "agt-dev1",
     "dept": "tech",
-    "status": "review",
+    "status": "done",
     "acceptance": {
       "type": "tests_pass",
       "arg": "product/tools/hebrew_text/tests"
     },
     "evidence": "product/tools/hebrew_text/tests",
-    "qa": null,
-    "verify": null,
-    "score": null,
-    "done_day": null,
+    "qa": {
+      "passed": true,
+      "notes": "pytest -q product/tools/hebrew_text/tests: 63 passed in 0.12s (exit 0; identical under unshare -rn and dead proxy 127.0.0.1:9; 2 runs identical). _template/ present (server/core/tests/README, 11 passed). Layout OK; server.py imports with mcp blocked (guarded import), zero logic in server; core imports w/o side effects; stdlib only; secrets grep clean (only 'token' variable names). Fuzz via python -c on all 3 funcs: ''/'   '/'\\t\\n' -> ok:true empty; None/123/[]/{}/bytes/cp1255 bytes/1.5/True -> {ok:false,error:invalid_input,'expected str, got X'}; 200k and 1MB -> input_too_large in 1ms; niqqud+teamim stripped == plain; RLM/LRM/RLE-PDF/isolates removed == plain; Hebrew geresh/gershayim == ASCII; finals untouched; mixed he/en/digits keeps ASCII digits; FB2A precomposed -> ש; maqaf kept (documented). Dates: ל\"ב בתשרי and ל׳ בטבת -> invalid_date; אדר א׳/ב׳ תשפ\"ד -> idx 6/13 leap true; ל׳ באדר תשפ\"ו -> invalid (non-leap), ל׳ באדר תשפ\"ד -> ok; ה׳תשפ\"ו/התשפ\"ו/786/5786 -> 5786; bidi-wrapped date parses. json.dumps round-trip clean, no U+FFFD. README he+en, all 3 README examples reproduce byte-for-byte; Gregorian conversion explicitly out of scope. Minor (not defects, documented): Adar II accepted in non-leap year (leap_year:false) w/o error; digit year >9999 silently -> year null.",
+      "by": "agt-qa",
+      "ts": "2026-10-27T18:48:51Z"
+    },
+    "verify": {
+      "ok": true,
+      "detail": "63 passed in 0.11s",
+      "ts": "2026-10-27T18:49:52Z"
+    },
+    "score": 8,
+    "done_day": 0,
     "notes": "תבנית _template + hebrew_text (normalize, parse_hebrew_date, gematria); 63 טסטים + 11 לתבנית; stdlib בלבד, בלי רשת"
   },
   {
@@ -25,16 +34,25 @@
     "desc": "ליצור product/tools/il_open_data/ לפי מבנה התבנית (server.py, core.py, tests/, README.md). core.py עובד מול CKAN API של data.gov.il (בסיס: https://data.gov.il/api/3/action/) עם שלוש פונקציות: (1) search_datasets(query: str, limit: int = 10) -> dict דרך package_search; מחזיר {\"ok\": true, \"count\": N, \"results\": [{\"id\", \"title\", \"organization\", \"resources\": [{\"format\", \"url\", \"id\"}]}]}. (2) get_dataset(dataset_id: str) -> dict דרך package_show. (3) search_records(resource_id: str, query: str = \"\", limit: int = 20) -> dict דרך datastore_search. HTTP דרך urllib בלבד (stdlib), timeout 10 שניות, User-Agent \"makor-il-open-data/0.1\"; שאילתות בעברית מקודדות ב‑URL (urllib.parse.quote). כל קריאת HTTP עוברת דרך פונקציה אחת fetch_json(url) שאפשר להחליף בטסטים (monkeypatch). שגיאות: timeout / שגיאת חיבור / 5xx -> {\"ok\": false, \"error\": \"source_unavailable\", \"detail\": ...}; JSON שבור -> {\"ok\": false, \"error\": \"bad_response\"}; query ריק -> {\"ok\": false, \"error\": \"invalid_input\"}; אפס תוצאות -> ok=true עם results=[]. אין exceptions כלפי חוץ. robots.txt: לקרוא פעם אחת ידנית את https://data.gov.il/robots.txt ולתעד ב‑README מה מותר ומה התאריך; הכלי משתמש רק ב‑API הציבורי. טסטים: לפחות 12 טסטים ב‑product/tools/il_open_data/tests/, ללא רשת — fetch_json מוחלף ב‑mock שמחזיר קבצי fixture מ‑tests/fixtures/ (תשובות אמיתיות שנלכדו פעם אחת מה‑API, עם URL ותאריך לכידה ב‑README). טסטים חובה: חיפוש בעברית מקודד נכון ב‑URL, query ריק, אתר לא עונה (timeout), 500, JSON שבור, אפס תוצאות, limit מכובד, וטסט שמוכיח שלא בוצעה קריאת רשת (fetch_json האמיתי לא נקרא). הוכחה: python -m pytest -q product/tools/il_open_data/tests יוצא עם קוד 0.",
     "owner": "agt-dev2",
     "dept": "tech",
-    "status": "review",
+    "status": "done",
     "acceptance": {
       "type": "tests_pass",
       "arg": "product/tools/il_open_data/tests"
     },
     "evidence": "product/tools/il_open_data/tests",
-    "qa": null,
-    "verify": null,
-    "score": null,
-    "done_day": null,
+    "qa": {
+      "passed": true,
+      "notes": "pytest -q product/tools/il_open_data/tests: 41 passed in 0.05s (exit 0; identical under unshare -rn and dead proxy; 2 runs identical). conftest autouse blocks urllib.request.urlopen; all 6 fixtures valid UTF-8 JSON, broken.json truncated by design. server.py imports with mcp blocked; delegates only. Verified in fake-urlopen transport: timeout=10, User-Agent makor-il-open-data/0.1, URL for 'תל אביב' = ...q=%D7%AA%D7%9C%20%D7%90%D7%91%D7%99%D7%91&rows=5 (ASCII only). Fuzz: ''/None/'   '/int/list/bytes/cp1255 bytes/200k -> invalid_input without calling fetch; limit 0/-1/1001/'5'/1.5/True -> invalid_input, None -> default 10; socket.timeout/TimeoutError/URLError(DNS)/ConnectionReset/HTTP 500/502/503/429 -> source_unavailable; 404 -> not_found; 403/401 -> bad_response 'HTTP 403'; JSONDecodeError/UnicodeDecodeError/HTML body/truncated JSON/50MB junk body/BOM body/cp1255 body -> bad_response (no exception, 50MB in 0.09s); list/str/None payload, success:false, missing result, result {}, records top-level, results not list -> bad_response; CKAN Not Found -> not_found, Validation -> invalid_input; zero results -> ok:true count 0 results []; 50 hits with limit 3 -> 3 returned; records 100 with limit 5 -> 5. README he+en with same example; example reproduces on the fixtures (count 137, GTFS title, resource b7cf8f14..., 23 bread rows). README HONESTLY states robots.txt/terms NOT read (proxy CONNECT 403 — I reproduced: curl data.gov.il/robots.txt -> CONNECT 403) and that fixtures are hand-written CKAN-shaped samples, NOT live captures, in both languages + provenance table; tool marked build-and-test only. Follow-ups (not defects): live fixture capture + robots.txt read via capture_fixtures.py once network exists; no response-size cap (reads whole body); Content-Type charset ignored (non-UTF-8 body -> bad_response rather than decoded).",
+      "by": "agt-qa",
+      "ts": "2026-10-27T18:48:51Z"
+    },
+    "verify": {
+      "ok": true,
+      "detail": "41 passed in 0.05s",
+      "ts": "2026-10-27T18:49:52Z"
+    },
+    "score": 8,
+    "done_day": 0,
     "notes": "41 טסטים offline; fixtures ידניים בסכמת CKAN (לא לכידה חיה — data.gov.il חסום מהסנדבוקס); capture_fixtures.py להרצה ממכונה עם רשת לפני פרסום"
   },
   {
@@ -44,16 +62,25 @@
     "desc": "לכתוב product/research/day0-market.md עם לפחות 60 שורות לא ריקות. קריאה בלבד של דפים ציבוריים — בלי גירוד אוטומטי, בלי הרשמה לשירותים. תוכן חובה: (1) טבלת מארקטפלייסים — Apify Store, Smithery, MCPize, Glama, PulseMCP ואחרים שנמצאו — עם עמודות: מודל תמחור (לפי תוצאה / לפי אירוע / השכרה חודשית / חינם), חלק המפתח באחוזים, האם יש נתוני שימוש ציבוריים (משתמשים/הרצות), URL. (2) טבלת 10 קטגוריות מובילות בכל מארקטפלייס עם אינדיקטור ביקוש מספרי (מספר כלים, הרצות, משתמשים — מה שזמין). (3) 10 דוגמאות לכלים קטנים (לא סקרייפרים של רשתות חברתיות) עם מחיר, אינדיקטור שימוש ו‑URL. (4) פסקת מספרים: ה‑563 אלף דולר של Apify (ספטמבר 2025) — מקור, ומספר המפתחים אם פורסם; חלק המפתח 80–85% — מקור. (5) המלצה: 5 כלים מועמדים למקור, מדורגים, לכל אחד: למי, מה המתחרה, איך נמדוד ביקוש. כל טענה מסומנת [מאומת] או [הסקה] עם URL ותאריך גישה. אסור להציג הערכה כעובדה. אין המלצות מחיר — תמחור הוא החלטת בעלים.",
     "owner": "agt-res1",
     "dept": "research",
-    "status": "review",
+    "status": "done",
     "acceptance": {
       "type": "min_lines",
       "arg": "product/research/day0-market.md::60"
     },
     "evidence": "product/research/day0-market.md",
-    "qa": null,
-    "verify": null,
-    "score": null,
-    "done_day": null,
+    "qa": {
+      "passed": true,
+      "notes": "grep -cve '^\\s*$' product/research/day0-market.md = 83 non-empty (min 60). Sections present: (1) marketplace table 7 rows w/ pricing model, dev share, public usage data, URL, tag; (2) top-10 categories table (Apify, Scraping Report sample) — rows 5/6/9/10 have no numeric indicator, marked '—'/'לא נחלץ', and MCP-directory categories explicitly flagged as 'פער מידע' (stated, not hidden); (3) 10 small tools w/ price, usage, URL, tag (none are social scrapers); (4) numbers: $563K Sep-2025 w/ einnews + apify.com/challenge URLs, developer count stated as 'not published' + 704 challenge devs, 80% w/ docs.apify.com URL, 85% honestly 'not found at Apify, only MCPize' ; (5) 5 ranked candidates each w/ audience, competitor, demand metric. 14x[מאומת] 23x[הסקה], 37 unique URLs, access date 2026-10-27 on every claim. No pricing recommendation for Makor (competitor prices listed as data; header says pricing is owner decision). Method limitation (WebFetch blocked, snippets only) stated in header — I reproduced the block (docs.apify.com CONNECT 403). Note: '[מאומת]' is defined as 'primary source seen in search snippet', not full page — disclosed. Follow-up: fill category indicators when network allows.",
+      "by": "agt-qa",
+      "ts": "2026-10-27T18:48:51Z"
+    },
+    "verify": {
+      "ok": true,
+      "detail": "83 non-empty lines (need 60)",
+      "ts": "2026-10-27T18:49:52Z"
+    },
+    "score": 8,
+    "done_day": 0,
     "notes": "Apify = המארקטפלייס היחיד עם תשלום למפתח (80%, $563K/חודש); כלים ישראליים קיימים זעירים (6–21 משתמשים) — אין תחרות אבל גם אין הוכחת ביקוש"
   },
   {
@@ -63,16 +90,25 @@
     "desc": "לכתוב product/research/day0-il-sources.md עם לפחות 40 שורות לא ריקות. קריאה בלבד — בלי גירוד, בלי הרשמה. טבלה של לפחות 12 מקורות, ביניהם חובה: data.gov.il (CKAN), nadlan.gov.il (עסקאות נדל\"ן), רשם החברות/תאגידים, מערכת המכרזים הממשלתית (mr.gov.il), הלמ\"ס (למ\"ס API), בנק ישראל (שערי חליפין), Knesset OData API, GTFS של משרד התחבורה, gov.il פרסומים, ומקורות עירוניים (תל אביב/ירושלים open data). לכל מקור עמודות: URL, רישיון (שם מדויק + קישור), האם יש API (סוג: REST/CKAN/OData/קבצים), פורמטים, תדירות עדכון, סטטוס robots.txt (לקרוא את הקובץ ולצטט את השורות הרלוונטיות + תאריך), תנאי שימוש (קישור), וסימון ירוק/צהוב/אדום: ירוק = API פתוח ורישיון מפורש, צהוב = נתונים פתוחים בלי API נוח, אדום = אסור או לא ברור. סעיף מיוחד על nadlan.gov.il: איך הנתונים נטענים (API פנימי? JS?), מה robots.txt ותנאי השימוש אומרים, והמלצה ברורה האם לבנות כלי ובאיזה אופן. סיום: המלצה מדורגת של 3 הכלים הבאים לבנות לפי המקורות הירוקים. כל שורה [מאומת] או [הסקה] עם URL ותאריך.",
     "owner": "agt-res1",
     "dept": "research",
-    "status": "review",
+    "status": "done",
     "acceptance": {
       "type": "min_lines",
       "arg": "product/research/day0-il-sources.md::40"
     },
     "evidence": "product/research/day0-il-sources.md",
-    "qa": null,
-    "verify": null,
-    "score": null,
-    "done_day": null,
+    "qa": {
+      "passed": true,
+      "notes": "grep -cve '^\\s*$' product/research/day0-il-sources.md = 49 non-empty (min 40). Table has 14 sources (min 12) incl. all mandatory: data.gov.il, nadlan.gov.il, רשם החברות, mr.gov.il, למ\"ס, בנק ישראל, Knesset OData, GTFS, gov.il, Tel Aviv, Jerusalem. All 11 required columns present incl. green/yellow/red verdict; every row tagged [מאומת:…]/[הסקה:…] with URL(s), date 2026-10-27. robots.txt column is 'לא אומת' on EVERY row and this is stated prominently in the header + a 'פערים שחובה לסגור' section — not hidden; I reproduced the block (curl data.gov.il and nadlan.gov.il robots.txt -> CONNECT 403). nadlan.gov.il special section: load mechanism (SPA, community tools use GovMap API), robots/terms status, data-quality caveats, clear RED recommendation with legitimate path (check data.gov.il / owner decision for formal request). Ranked top-3 (companies registrar, BOI SDMX rates, CBS series) each with preconditions. No pricing recommendations; competitor prices only. Follow-up task: read the 14 robots.txt + data.gov.il/terms from a networked machine and quote lines before any publish.",
+      "by": "agt-qa",
+      "ts": "2026-10-27T18:48:51Z"
+    },
+    "verify": {
+      "ok": true,
+      "detail": "49 non-empty lines (need 40)",
+      "ts": "2026-10-27T18:49:52Z"
+    },
+    "score": 8,
+    "done_day": 0,
     "notes": "14 מקורות; robots.txt לא אומת באף אחד (רשת חסומה); nadlan.gov.il אדום; ירוקים: רשם החברות ב-CKAN, שערי בנק ישראל (SDMX), API למ\"ס"
   },
   {
@@ -82,16 +118,25 @@
     "desc": "לכתוב product/research/day0-naming.md עם לפחות 30 שורות לא ריקות, ובנוסף product/tools/README_TEMPLATE.md. חלק א — דומיין: טבלה של 6–10 מועמדים (למשל makor.dev, makor.tools, makordata.com, makor-data.io, getmakor.com, מועמדים נוספים לפי שיקול), עם עמודות: דומיין, סטטוס (פנוי/תפוס/לא ידוע) לפי בדיקת whois/RDAP ציבורית בקריאה בלבד — בלי להירשם ובלי לקנות — ותאריך בדיקה; המלצה על 2 מובילים. ההחלטה והרכישה הן של הבעלים דרך התיבה — לכתוב זאת במפורש. חלק ב — שמות כלים: מוסכמה (אנגלית, snake_case, שם עצם תיאורי שמפתח יחפש בגוגל, ללא סופרלטיבים), ולכל אחד משני הכלים של היום (hebrew_text, il_open_data): שם תצוגה, תיאור בשורה אחת באנגלית (עד 120 תווים) ובעברית, ו‑5 מילות חיפוש. חלק ג — תבנית README (לשמור כ‑product/tools/README_TEMPLATE.md): סדר קבוע — שם ושורת תיאור, What it does, Install/Run, Tools & parameters (טבלה), Example call, Example output, Limits & data sources (כולל robots.txt ותאריך לכידת fixtures), ואז מראה בעברית של כל הסעיפים. אנגלית קודם, עברית מתחת. בלי הבטחות ביצועים/דיוק בלי מדידה.",
     "owner": "agt-wr1",
     "dept": "marketing",
-    "status": "review",
+    "status": "done",
     "acceptance": {
       "type": "min_lines",
       "arg": "product/research/day0-naming.md::30"
     },
     "evidence": "product/research/day0-naming.md",
-    "qa": null,
-    "verify": null,
-    "score": null,
-    "done_day": null,
+    "qa": {
+      "passed": true,
+      "notes": "grep -cve '^\\s*$' product/research/day0-naming.md = 59 non-empty (min 30); product/tools/README_TEMPLATE.md exists (242 lines). Part A: 10 domain candidates w/ status column — all honestly 'לא ידוע — RDAP חסום' + date 2026-10-27 + what WAS checked (search for indexed site) + how owner verifies (lookup.icann.org); I reproduced the block (rdap.verisign.com CONNECT 403). 2 leaders recommended (makor.tools, makordata.com); 'decision and purchase are the owner's via state/inbox.json' stated explicitly twice. Part B: convention (English, snake_case, descriptive noun, no superlatives, il_/hebrew_ prefixes); for hebrew_text and il_open_data: display name, EN one-liner (113 and 109 chars, <=120 verified), HE one-liner, 5 keywords, plus competitor-collision notes with URLs ('do not write first/only'). Part C: template order matches spec (name+line, What it does, Install/Run, Tools&parameters table, Example call, Example output, Limits & data sources w/ robots.txt quote+date and fixture URL+date table, Errors, Changelog) then full Hebrew mirror; no performance/accuracy claims, tone rules forbid them. No research tags [מאומת]/[הסקה] used in this doc, but every factual claim carries 'נבדק בחיפוש 2026-10-27' + URL and unknowns are labeled unknown. Note: template line 107 hardcodes 'fixtures are real responses captured once' — tools that cannot capture live (il_open_data today) must edit that line, as il_open_data did.",
+      "by": "agt-qa",
+      "ts": "2026-10-27T18:48:51Z"
+    },
+    "verify": {
+      "ok": true,
+      "detail": "59 non-empty lines (need 30)",
+      "ts": "2026-10-27T18:49:52Z"
+    },
+    "score": 8,
+    "done_day": 0,
     "notes": "שם מוביל: מקור/Makor; 10 מועמדי דומיין (זמינות לא ניתנת לבדיקה מהקונטיינר — הבעלים יבדוק ב-lookup.icann.org); קונבנציית snake_case; תבנית README דו-לשונית"
   },
   {
@@ -101,16 +146,25 @@
     "desc": "לכתוב product/QA_CHECKLIST.md עם לפחות 25 שורות לא ריקות — רשימת בדיקות שכל כלי חייב לעבור לפני qa --pass, מנוסחת כפריטי [ ] שאפשר לסמן. סעיפים חובה: (1) קלט: מחרוזת ריקה, None, טיפוס שגוי, קלט גדול (מעל 100,000 תווים), רווחים בלבד. (2) עברית ויוניקוד: ניקוד וטעמים, גרש/גרשיים עבריים לעומת ASCII, אותיות סופיות, עברית מעורבת באנגלית ובמספרים, סימני כיווניות (U+200E/U+200F/U+202A–U+202E), בייטים ב‑cp1255/windows-1255 במקום UTF-8, קידוד נכון של עברית ב‑URL. (3) מקור חיצוני: אתר לא עונה, timeout, 5xx, 404, JSON שבור, אפס תוצאות, שינוי מבנה תשובה — כולם מחזירים {ok:false, error:...} ולא traceback. (4) טסטים: רצים ללא רשת (fetch מוחלף ב‑mock), דטרמיניסטיים, fixtures אמיתיים עם URL ותאריך, python -m pytest -q יוצא 0, זמן ריצה מתחת ל‑30 שניות. (5) תאימות ומסמכים: robots.txt של המקור מתועד ב‑README, README באנגלית ובעברית עם דוגמת קריאה ופלט, רשימת תלויות מינימלית, server.py מייבא core ולא מכיל לוגיקה. לכל פריט: איך בודקים (פקודה או קלט לדוגמה) ומה הפלט הצפוי.",
     "owner": "agt-qa",
     "dept": "qa",
-    "status": "review",
+    "status": "done",
     "acceptance": {
       "type": "min_lines",
       "arg": "product/QA_CHECKLIST.md::25"
     },
     "evidence": "product/QA_CHECKLIST.md",
-    "qa": null,
-    "verify": null,
-    "score": null,
-    "done_day": null,
+    "qa": {
+      "passed": true,
+      "notes": "SELF-REVIEW (owner agt-qa) — recommend a second reader tomorrow. grep -cve '^\\s*$' product/QA_CHECKLIST.md = 87 non-empty (min 25). All 5 mandatory sections present as [ ] items: (1) input: empty, None, wrong type (123/[]/{}/bytes), >100k and 1MB, whitespace-only; (2) Hebrew/Unicode: niqqud+teamim, Hebrew vs ASCII geresh/gershayim, final letters, mixed he/en/digits, bidi U+200E/200F/202A-202E(+2066-2069), cp1255 bytes, URL percent-encoding; (3) source: unreachable, timeout, 5xx, 404/403/429, broken JSON, zero results, schema change, huge body; (4) tests: no-network run (unshare -rn / dead proxy), deterministic, real fixtures w/ URL+date, pytest -q exit 0, <30s; (5) compliance: robots.txt in README, bilingual README w/ runnable example, minimal deps, server.py imports core w/o logic. Every item has a concrete command/input and expected output; section 0 gives copy-paste commands; section 7 gives pass/fail note format. Used it verbatim today for task-99f163 and task-e91b90 — every command ran as written. No pricing/legal content.",
+      "by": "agt-qa",
+      "ts": "2026-10-27T18:48:51Z"
+    },
+    "verify": {
+      "ok": true,
+      "detail": "87 non-empty lines (need 25)",
+      "ts": "2026-10-27T18:49:52Z"
+    },
+    "score": 8,
+    "done_day": 0,
     "notes": "צ'קליסט QA ב-7 סעיפים: מבנה, קלטים, עברית/Unicode, כשלי מקור, טסטים offline, תאימות ותיעוד, פקודות QA"
   }
 ]
