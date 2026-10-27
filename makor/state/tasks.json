@@ -24,16 +24,17 @@
     "desc": "ליצור product/tools/il_open_data/ לפי מבנה התבנית (server.py, core.py, tests/, README.md). core.py עובד מול CKAN API של data.gov.il (בסיס: https://data.gov.il/api/3/action/) עם שלוש פונקציות: (1) search_datasets(query: str, limit: int = 10) -> dict דרך package_search; מחזיר {\"ok\": true, \"count\": N, \"results\": [{\"id\", \"title\", \"organization\", \"resources\": [{\"format\", \"url\", \"id\"}]}]}. (2) get_dataset(dataset_id: str) -> dict דרך package_show. (3) search_records(resource_id: str, query: str = \"\", limit: int = 20) -> dict דרך datastore_search. HTTP דרך urllib בלבד (stdlib), timeout 10 שניות, User-Agent \"makor-il-open-data/0.1\"; שאילתות בעברית מקודדות ב‑URL (urllib.parse.quote). כל קריאת HTTP עוברת דרך פונקציה אחת fetch_json(url) שאפשר להחליף בטסטים (monkeypatch). שגיאות: timeout / שגיאת חיבור / 5xx -> {\"ok\": false, \"error\": \"source_unavailable\", \"detail\": ...}; JSON שבור -> {\"ok\": false, \"error\": \"bad_response\"}; query ריק -> {\"ok\": false, \"error\": \"invalid_input\"}; אפס תוצאות -> ok=true עם results=[]. אין exceptions כלפי חוץ. robots.txt: לקרוא פעם אחת ידנית את https://data.gov.il/robots.txt ולתעד ב‑README מה מותר ומה התאריך; הכלי משתמש רק ב‑API הציבורי. טסטים: לפחות 12 טסטים ב‑product/tools/il_open_data/tests/, ללא רשת — fetch_json מוחלף ב‑mock שמחזיר קבצי fixture מ‑tests/fixtures/ (תשובות אמיתיות שנלכדו פעם אחת מה‑API, עם URL ותאריך לכידה ב‑README). טסטים חובה: חיפוש בעברית מקודד נכון ב‑URL, query ריק, אתר לא עונה (timeout), 500, JSON שבור, אפס תוצאות, limit מכובד, וטסט שמוכיח שלא בוצעה קריאת רשת (fetch_json האמיתי לא נקרא). הוכחה: python -m pytest -q product/tools/il_open_data/tests יוצא עם קוד 0.",
     "owner": "agt-dev2",
     "dept": "tech",
-    "status": "in_progress",
+    "status": "review",
     "acceptance": {
       "type": "tests_pass",
       "arg": "product/tools/il_open_data/tests"
     },
-    "evidence": null,
+    "evidence": "product/tools/il_open_data/tests",
     "qa": null,
     "verify": null,
     "score": null,
-    "done_day": null
+    "done_day": null,
+    "notes": "41 טסטים offline; fixtures ידניים בסכמת CKAN (לא לכידה חיה — data.gov.il חסום מהסנדבוקס); capture_fixtures.py להרצה ממכונה עם רשת לפני פרסום"
   },
   {
     "id": "task-ea1c3b",
