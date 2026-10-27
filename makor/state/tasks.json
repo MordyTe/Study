@@ -78,16 +78,17 @@
     "desc": "לכתוב product/research/day0-naming.md עם לפחות 30 שורות לא ריקות, ובנוסף product/tools/README_TEMPLATE.md. חלק א — דומיין: טבלה של 6–10 מועמדים (למשל makor.dev, makor.tools, makordata.com, makor-data.io, getmakor.com, מועמדים נוספים לפי שיקול), עם עמודות: דומיין, סטטוס (פנוי/תפוס/לא ידוע) לפי בדיקת whois/RDAP ציבורית בקריאה בלבד — בלי להירשם ובלי לקנות — ותאריך בדיקה; המלצה על 2 מובילים. ההחלטה והרכישה הן של הבעלים דרך התיבה — לכתוב זאת במפורש. חלק ב — שמות כלים: מוסכמה (אנגלית, snake_case, שם עצם תיאורי שמפתח יחפש בגוגל, ללא סופרלטיבים), ולכל אחד משני הכלים של היום (hebrew_text, il_open_data): שם תצוגה, תיאור בשורה אחת באנגלית (עד 120 תווים) ובעברית, ו‑5 מילות חיפוש. חלק ג — תבנית README (לשמור כ‑product/tools/README_TEMPLATE.md): סדר קבוע — שם ושורת תיאור, What it does, Install/Run, Tools & parameters (טבלה), Example call, Example output, Limits & data sources (כולל robots.txt ותאריך לכידת fixtures), ואז מראה בעברית של כל הסעיפים. אנגלית קודם, עברית מתחת. בלי הבטחות ביצועים/דיוק בלי מדידה.",
     "owner": "agt-wr1",
     "dept": "marketing",
-    "status": "in_progress",
+    "status": "review",
     "acceptance": {
       "type": "min_lines",
       "arg": "product/research/day0-naming.md::30"
     },
-    "evidence": null,
+    "evidence": "product/research/day0-naming.md",
     "qa": null,
     "verify": null,
     "score": null,
-    "done_day": null
+    "done_day": null,
+    "notes": "שם מוביל: מקור/Makor; 10 מועמדי דומיין (זמינות לא ניתנת לבדיקה מהקונטיינר — הבעלים יבדוק ב-lookup.icann.org); קונבנציית snake_case; תבנית README דו-לשונית"
   },
   {
     "id": "task-793bad",
