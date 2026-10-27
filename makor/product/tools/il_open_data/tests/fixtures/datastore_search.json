@@ -1,0 +1,26 @@
+{
+  "help": "https://data.gov.il/api/3/action/help_show?name=datastore_search",
+  "success": true,
+  "result": {
+    "include_total": true,
+    "resource_id": "b7cf8f14-64a2-4b33-8d4b-edb286fdbd37",
+    "fields": [
+      {"type": "int", "id": "_id"},
+      {"type": "text", "id": "שם המוצר"},
+      {"type": "text", "id": "יחידת מידה"},
+      {"type": "numeric", "id": "מחיר מרבי לצרכן"}
+    ],
+    "records_format": "objects",
+    "records": [
+      {"_id": 1, "שם המוצר": "לחם אחיד פרוס", "יחידת מידה": "750 גרם", "מחיר מרבי לצרכן": 8.96},
+      {"_id": 2, "שם המוצר": "חלב בשקית 3%", "יחידת מידה": "1 ליטר", "מחיר מרבי לצרכן": 6.19},
+      {"_id": 3, "שם המוצר": "ביצים גודל L", "יחידת מידה": "12 יחידות", "מחיר מרבי לצרכן": 13.19}
+    ],
+    "limit": 3,
+    "_links": {
+      "start": "/api/3/action/datastore_search?limit=3&resource_id=b7cf8f14-64a2-4b33-8d4b-edb286fdbd37",
+      "next": "/api/3/action/datastore_search?offset=3&limit=3&resource_id=b7cf8f14-64a2-4b33-8d4b-edb286fdbd37"
+    },
+    "total": 23
+  }
+}

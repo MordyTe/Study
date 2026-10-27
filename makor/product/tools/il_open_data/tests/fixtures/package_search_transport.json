@@ -1,0 +1,79 @@
+{
+  "help": "https://data.gov.il/api/3/action/help_show?name=package_search",
+  "success": true,
+  "result": {
+    "count": 137,
+    "sort": "score desc, metadata_modified desc",
+    "facets": {},
+    "results": [
+      {
+        "id": "8a21fc79-07c3-4f87-99f2-5c7e8a0f2c2d",
+        "name": "gtfs-static",
+        "title": "לוחות זמנים של התחבורה הציבורית (GTFS)",
+        "notes": "קובצי GTFS של התחבורה הציבורית בישראל, מתעדכנים מדי יום.",
+        "license_id": "other-open",
+        "license_title": "Other (Open)",
+        "metadata_modified": "2026-10-20T03:12:44.918201",
+        "organization": {
+          "id": "7d7d8d4e-0b3a-4c2b-9a39-1c4e0f4a7e11",
+          "name": "ministry_of_transport",
+          "title": "משרד התחבורה והבטיחות בדרכים",
+          "type": "organization",
+          "is_organization": true
+        },
+        "tags": [
+          {"id": "t1", "name": "תחבורה ציבורית", "display_name": "תחבורה ציבורית"},
+          {"id": "t2", "name": "GTFS", "display_name": "GTFS"}
+        ],
+        "resources": [
+          {
+            "id": "c1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a5b",
+            "package_id": "8a21fc79-07c3-4f87-99f2-5c7e8a0f2c2d",
+            "name": "israel-public-transportation.zip",
+            "format": "ZIP",
+            "url": "https://gtfs.mot.gov.il/gtfsfiles/israel-public-transportation.zip",
+            "last_modified": "2026-10-20T03:10:02.000000",
+            "datastore_active": false
+          },
+          {
+            "id": "d2b3c4d5-e6f7-4081-9bac-1d2e3f4a5b6c",
+            "package_id": "8a21fc79-07c3-4f87-99f2-5c7e8a0f2c2d",
+            "name": "stops.csv",
+            "format": "CSV",
+            "url": "https://data.gov.il/dataset/gtfs-static/resource/d2b3c4d5-e6f7-4081-9bac-1d2e3f4a5b6c/download/stops.csv",
+            "last_modified": "2026-10-20T03:10:05.000000",
+            "datastore_active": true
+          }
+        ]
+      },
+      {
+        "id": "f3e4d5c6-b7a8-4990-8b1c-2d3e4f5a6b7c",
+        "name": "road-accidents-2024",
+        "title": "תאונות דרכים עם נפגעים 2024",
+        "notes": "נתוני תאונות דרכים עם נפגעים, הלשכה המרכזית לסטטיסטיקה.",
+        "license_id": "other-open",
+        "license_title": "Other (Open)",
+        "metadata_modified": "2026-09-02T11:48:19.771002",
+        "organization": {
+          "id": "0a1b2c3d-4e5f-4607-8192-a3b4c5d6e7f8",
+          "name": "cbs",
+          "title": "הלשכה המרכזית לסטטיסטיקה",
+          "type": "organization",
+          "is_organization": true
+        },
+        "tags": [{"id": "t3", "name": "תאונות דרכים", "display_name": "תאונות דרכים"}],
+        "resources": [
+          {
+            "id": "e4f5a6b7-c8d9-4a01-9c2d-3e4f5a6b7c8d",
+            "package_id": "f3e4d5c6-b7a8-4990-8b1c-2d3e4f5a6b7c",
+            "name": "accidents_2024.xlsx",
+            "format": "XLSX",
+            "url": "https://data.gov.il/dataset/road-accidents-2024/resource/e4f5a6b7-c8d9-4a01-9c2d-3e4f5a6b7c8d/download/accidents_2024.xlsx",
+            "last_modified": "2026-09-02T11:47:00.000000",
+            "datastore_active": false
+          }
+        ]
+      }
+    ]
+  }
+}

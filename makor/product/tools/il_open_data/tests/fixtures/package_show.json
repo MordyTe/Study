@@ -1,0 +1,54 @@
+{
+  "help": "https://data.gov.il/api/3/action/help_show?name=package_show",
+  "success": true,
+  "result": {
+    "id": "2a1c6d20-3f3a-4bb1-9f7e-6d0c5a4e8b31",
+    "name": "mechirmnm",
+    "title": "מחירון מוצרי מזון בפיקוח",
+    "notes": "רשימת המוצרים שמחירם מפוקח והמחיר המרבי לצרכן.",
+    "license_id": "other-open",
+    "license_title": "Other (Open)",
+    "metadata_created": "2019-03-11T09:21:05.004321",
+    "metadata_modified": "2026-08-14T07:30:12.443210",
+    "state": "active",
+    "type": "dataset",
+    "private": false,
+    "organization": {
+      "id": "5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f",
+      "name": "ministry_of_economy",
+      "title": "משרד הכלכלה והתעשייה",
+      "type": "organization",
+      "is_organization": true
+    },
+    "tags": [
+      {"id": "t10", "name": "מזון", "display_name": "מזון"},
+      {"id": "t11", "name": "פיקוח מחירים", "display_name": "פיקוח מחירים"}
+    ],
+    "resources": [
+      {
+        "id": "b7cf8f14-64a2-4b33-8d4b-edb286fdbd37",
+        "package_id": "2a1c6d20-3f3a-4bb1-9f7e-6d0c5a4e8b31",
+        "name": "מחירון מוצרים בפיקוח",
+        "format": "CSV",
+        "url": "https://data.gov.il/dataset/mechirmnm/resource/b7cf8f14-64a2-4b33-8d4b-edb286fdbd37/download/prices.csv",
+        "last_modified": "2026-08-14T07:29:40.000000",
+        "datastore_active": true,
+        "mimetype": "text/csv",
+        "size": 18422
+      },
+      {
+        "id": "9f8e7d6c-5b4a-4392-8170-fedcba987654",
+        "package_id": "2a1c6d20-3f3a-4bb1-9f7e-6d0c5a4e8b31",
+        "name": "הסבר למחירון",
+        "format": "PDF",
+        "url": "https://data.gov.il/dataset/mechirmnm/resource/9f8e7d6c-5b4a-4392-8170-fedcba987654/download/readme.pdf",
+        "last_modified": null,
+        "datastore_active": false,
+        "mimetype": "application/pdf",
+        "size": 90112
+      }
+    ],
+    "num_resources": 2,
+    "num_tags": 2
+  }
+}

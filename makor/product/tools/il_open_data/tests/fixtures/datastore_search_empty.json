@@ -1,0 +1,20 @@
+{
+  "help": "https://data.gov.il/api/3/action/help_show?name=datastore_search",
+  "success": true,
+  "result": {
+    "include_total": true,
+    "resource_id": "b7cf8f14-64a2-4b33-8d4b-edb286fdbd37",
+    "fields": [
+      {"type": "int", "id": "_id"},
+      {"type": "text", "id": "שם המוצר"},
+      {"type": "text", "id": "יחידת מידה"},
+      {"type": "numeric", "id": "מחיר מרבי לצרכן"}
+    ],
+    "records_format": "objects",
+    "records": [],
+    "limit": 20,
+    "q": "zzqx_no_such_value_7781",
+    "_links": {"start": "/api/3/action/datastore_search?q=zzqx_no_such_value_7781&limit=20&resource_id=b7cf8f14-64a2-4b33-8d4b-edb286fdbd37"},
+    "total": 0
+  }
+}
