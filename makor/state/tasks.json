@@ -6,16 +6,17 @@
     "desc": "א. תבנית: ליצור product/tools/_template/ עם server.py (עטיפת MCP דקה באמצעות ספריית mcp/FastMCP), core.py (פונקציות טהורות), tests/test_core.py (pytest, מייבא core בלבד — לא את server), README.md (אנגלית ואז עברית: משפט מה הכלי עושה, התקנה, רשימת כלים ופרמטרים, דוגמת קריאה ופלט, מגבלות ומקורות). תלויות מותרות: stdlib + mcp בלבד. ב. כלי: product/tools/hebrew_text/ באותו מבנה, עם שלוש פונקציות ב‑core.py: (1) normalize(text: str) -> dict: מסיר ניקוד וטעמים (U+0591–U+05C7), מאחד גרש/גרשיים עבריים (׳ ״) ומרכאות מסולסלות (“ ” ‘ ’) למרכאות ASCII, מסיר סימני כיווניות (U+200E, U+200F, U+202A–U+202E), ומכווץ רווחים כפולים; מחזיר {\"ok\": true, \"text\": ...}. (2) parse_hebrew_date(text: str) -> dict: עבור \"כ״ג בתשרי תשפ״ו\" (גם עם גרשיים ASCII וגם בלי ב' היחס) מחזיר {\"ok\": true, \"day\": 23, \"month\": \"תשרי\", \"month_index\": 1, \"year\": 5786}; שנה ללא אלפים מקבלת +5000; חודשים אדר א'/אדר ב' נתמכים; המרה לתאריך לועזי לא בהיקף — לכתוב ב‑README שלא נתמך. (3) gematria(text: str) -> dict: \"תשפ״ו\" -> {\"ok\": true, \"value\": 786}; אותיות סופיות שוות לרגילות; תווים שאינם עבריים מתעלמים מהם ומדווחים ב‑ignored. כללים: מחרוזת ריקה מחזירה ok=true עם תוצאה ריקה; None או טיפוס שאינו str מחזיר {\"ok\": false, \"error\": \"invalid_input\"}; קלט מעל 100,000 תווים מחזיר {\"ok\": false, \"error\": \"input_too_large\"}; אף פונקציה לא זורקת exception. טסטים: לפחות 15 טסטים ב‑product/tools/hebrew_text/tests/, כולל: קלט ריק, None, עברית מעורבת באנגלית, טקסט מנוקד, גרשיים בשני הסוגים, תאריך לא תקין (\"ל״ב בתשרי\"), אדר ב', קלט גדול מדי. אין גישה לרשת בטסטים. הוכחה: python -m pytest -q product/tools/hebrew_text/tests יוצא עם קוד 0.",
     "owner": "agt-dev1",
     "dept": "tech",
-    "status": "in_progress",
+    "status": "review",
     "acceptance": {
       "type": "tests_pass",
       "arg": "product/tools/hebrew_text/tests"
     },
-    "evidence": null,
+    "evidence": "product/tools/hebrew_text/tests",
     "qa": null,
     "verify": null,
     "score": null,
-    "done_day": null
+    "done_day": null,
+    "notes": "תבנית _template + hebrew_text (normalize, parse_hebrew_date, gematria); 63 טסטים + 11 לתבנית; stdlib בלבד, בלי רשת"
   },
   {
     "id": "task-e91b90",
