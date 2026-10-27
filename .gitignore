@@ -34,5 +34,4 @@ simple_transcriber/settings.json
 simple_transcriber/*.log
 simple_transcriber/glossary.txt
 
-# Makor company runtime artifacts
-makor/office/data.js
+# Makor: office/data.js is generated each workday but committed so the page works from the repo

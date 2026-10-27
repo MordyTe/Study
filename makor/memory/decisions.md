@@ -1,0 +1,9 @@
+- יום 0 (decision, meeting): שם החברה נשאר "מקור" (Makor) עד בדיקת זמינות דומיין; רכישת דומיין היא החלטת בעלים דרך state/inbox.json.
+- יום 0 (decision, meeting): מבנה אחיד לכל כלי: product/tools/<name>/server.py (עטיפת MCP דקה), core.py (פונקציות טהורות), tests/ (pytest, בלי רשת), README.md (אנגלית ואז עברית). תבנית ב‑product/tools/_template.
+- יום 0 (decision, meeting): כלים ליום 0: hebrew_text (נרמול ניקוד/גרשיים, פירוק תאריך עברי, גימטריה — פייתון טהור) ו‑il_open_data (חיפוש CKAN ב‑data.gov.il עם fixtures אמיתיים ו‑mocks).
+- יום 0 (decision, meeting): nadlan.gov.il לא נבנה היום; נכנס לסקר המקורות (רישיון, API, robots.txt). אם ירוק — הכלי השלישי, לפני כלים גלובליים.
+- יום 0 (decision, meeting): טסטים אסור שיגעו ברשת; mocks מבוססים על קבצי fixture שנלכדו מה‑API האמיתי עם URL ותאריך ב‑README.
+- יום 0 (decision, meeting): כל שגיאה מוחזרת כאובייקט {ok:false, error:...} ולא כ‑exception; מגבלת גודל קלט מתועדת בכל כלי.
+- יום 0 (decision, meeting): גיוס ארבעה עובדים: שני מפתחים (agt-dev1, agt-dev2), חוקר (agt-res1), כותבת (agt-wr1). הערכה לפי verify של יום 1 בלבד.
+- יום 0 (decision, meeting): שש משימות ליום 0, לכל אחת קריטריון קבלה שסקריפט בודק (tests_pass / min_lines). אין פרסום עד שהבעלים פותח חשבונות.
+- יום 0 (decision, meeting): בקשה לבעלים בתיבה: פתיחת חשבונות Apify ו‑Smithery (ללא פעולה מצד הסוכנים), ואישור דומיין כשתהיה רשימת מועמדים.

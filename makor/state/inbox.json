@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "id": "q-82a3a9",
+    "day": 0,
+    "question": "לפתוח חשבון מפתח ב-Apify (console.apify.com → Monetization) וחשבון ב-Smithery, כדי שנוכל לפרסם כלים ולקבל תשלומים.",
+    "context": "עד אז בונים ובודקים בלבד. הוראות ב-OWNER_SETUP.md",
+    "status": "open",
+    "answer": null,
+    "ts": "2026-10-27T18:29:32Z"
+  }
+]
