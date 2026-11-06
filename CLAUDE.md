@@ -29,7 +29,7 @@ agent-play sim play "reach the star"   # watch the agent play the built-in simul
 | Vision nodes are hypotheses: they carry `confidence` and `source`, and fusion never silently overwrites a higher-priority source | `perception/fusion.py` |
 | The agent loop observes after every action; it never reasons from a stale frame | `agent/loop.py`, `tests/test_agent_loop.py` |
 | Input injection is behind `InputBackend`; tests use `DryRunBackend` or the simulator | `actions/backend.py` |
-| The simulator and the real pipeline share the same code path | `sim/`, `tests/test_sim_end_to_end.py` |
+| The simulator and the real pipeline share the same code path | `sim/`, `tests/test_agent_loop.py`, `tests/test_cli.py` |
 
 ## Safety and honesty rules
 
