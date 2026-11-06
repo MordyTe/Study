@@ -57,6 +57,40 @@ class GridGame:
     def status(self) -> dict[str, Any]:
         return {"state": self.state, "player": list(self.player), "goal": list(self.goal), "moves": self.moves}
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "state": self.state,
+            "player": list(self.player),
+            "goal": list(self.goal),
+            "start": list(self.start),
+            "walls": sorted(list(w) for w in self.walls),
+            "moves": self.moves,
+            "history": list(self.history),
+        }
+
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> "GridGame":
+        game = GridGame(goal=tuple(data["goal"]), start=tuple(data["start"]), walls={tuple(w) for w in data["walls"]})
+        game.state = data["state"]
+        game.player = tuple(data["player"])
+        game.moves = int(data["moves"])
+        game.history = list(data.get("history", []))
+        return game
+
+    def save(self, path: Path) -> None:
+        import json
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.to_dict()), encoding="utf-8")
+
+    @staticmethod
+    def load(path: Path) -> "GridGame":
+        import json
+
+        if not path.exists():
+            return GridGame()
+        return GridGame.from_dict(json.loads(path.read_text(encoding="utf-8")))
+
     def handle(self, event: InputEvent) -> None:
         if event.kind == "mouse_up" and event.button == "left" and event.x is not None and event.y is not None:
             self._click(event.x, event.y)

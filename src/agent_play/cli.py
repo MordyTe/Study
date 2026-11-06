@@ -34,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--region", help="x,y,w,h region of the monitor to capture")
     parser.add_argument("--image", help="Use a PNG file as the screen instead of capturing (tests, replays)")
     parser.add_argument("--no-redact", action="store_true", help="Keep text values in the trace")
+    parser.add_argument("--sim", action="store_true", help="Drive the built-in simulator instead of the screen; its state persists per session")
 
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status", help="Platform, backends and perceivers available here")
@@ -85,6 +86,8 @@ def build_parser() -> argparse.ArgumentParser:
     frame.add_argument("--out", required=True)
     frame.add_argument("--state", default="title", choices=["title", "dialog", "playing", "won"])
     sim_sub.add_parser("snapshot", help="Observe the simulator through the template perceiver")
+    sim_sub.add_parser("status", help="Ground-truth state of the persisted simulator (for humans, not for the agent)")
+    sim_sub.add_parser("reset", help="Reset the persisted simulator to the title screen")
     play = sim_sub.add_parser("play", help="Let the model play the simulator")
     play.add_argument("task", nargs="?", default="Reach the star.")
     play.add_argument("--max-steps", type=int, default=30)
@@ -101,11 +104,28 @@ def _session_id(args: argparse.Namespace) -> str:
     return args.session or os.environ.get("AGENT_PLAY_SESSION") or "default"
 
 
+def _sim_state_path(args: argparse.Namespace) -> Path:
+    return _state_root(args) / "sessions" / _session_id(args) / "sim-state.json"
+
+
+def _load_sim(args: argparse.Namespace) -> Any:
+    from agent_play.sim.grid_game import GridGame
+
+    return GridGame.load(_sim_state_path(args))
+
+
 def build_session(args: argparse.Namespace) -> Session:
     from agent_play.perception.capture import ScreenCapture, StaticFrameSource
     from agent_play.perception.ocr import OcrPerceiver
     from agent_play.perception.template import TemplateLibrary, TemplatePerceiver
 
+    if args.sim:
+        from agent_play.sim.grid_game import make_session
+
+        game = _load_sim(args)
+        session = make_session(game, root=_state_root(args), session_id=_session_id(args))
+        session.sim_game = game  # type: ignore[attr-defined]
+        return session
     if args.image:
         from PIL import Image
 
@@ -232,13 +252,20 @@ def cmd_run(args: argparse.Namespace, session: Session) -> dict[str, Any]:
 def cmd_sim(args: argparse.Namespace) -> dict[str, Any]:
     from agent_play.sim.grid_game import GridGame, make_session, path_to_goal
 
-    game = GridGame()
     if args.sim_command == "frame":
+        game = GridGame()
         game.state = args.state
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
         game.render().save(out)
         return {"path": str(out), "state": args.state, "width": game.render().width, "height": game.render().height}
+    if args.sim_command == "status":
+        return {"game": _load_sim(args).status(), "state_path": str(_sim_state_path(args))}
+    if args.sim_command == "reset":
+        game = GridGame()
+        game.save(_sim_state_path(args))
+        return {"game": game.status(), "state_path": str(_sim_state_path(args))}
+    game = _load_sim(args)
     extra: list[Any] = []
     if args.sim_command == "play" and args.vision:
         from agent_play.perception.vision_llm import (
@@ -250,7 +277,8 @@ def cmd_sim(args: argparse.Namespace) -> dict[str, Any]:
     session = make_session(game, root=_state_root(args), extra_perceivers=extra, session_id=_session_id(args))
     if args.sim_command == "snapshot":
         snapshot = session.observe()
-        return {"snapshot_id": snapshot.snapshot_id, "ref_count": snapshot.ref_count(), "scene": snapshot.compact_text(), "game": game.status()}
+        game.save(_sim_state_path(args))
+        return {"snapshot_id": snapshot.snapshot_id, "ref_count": snapshot.ref_count(), "scene": snapshot.compact_text()}
     from agent_play.agent.loop import AgentConfig, GameAgent
 
     if args.scripted:
@@ -276,6 +304,7 @@ def cmd_sim(args: argparse.Namespace) -> dict[str, Any]:
     agent = GameAgent(session, model, AgentConfig(max_steps=args.max_steps, include_image=not args.scripted), skills=["core", "genres/puzzle"], log=_stderr)
     result = agent.run(args.task).to_dict()
     result["game"] = game.status()
+    game.save(_sim_state_path(args))
     return result
 
 
@@ -295,13 +324,18 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "sim":
         return cmd_sim(args)
     session = build_session(args)
-    if args.command == "snapshot":
-        return cmd_snapshot(args, session)
-    if args.command == "wait":
-        return session.wait(text=args.text, ref_id=args.ref, gone=args.gone, stable=args.stable, timeout_ms=args.timeout)
-    if args.command == "run":
-        return cmd_run(args, session)
-    return _action(args, session)
+    try:
+        if args.command == "snapshot":
+            return cmd_snapshot(args, session)
+        if args.command == "wait":
+            return session.wait(text=args.text, ref_id=args.ref, gone=args.gone, stable=args.stable, timeout_ms=args.timeout)
+        if args.command == "run":
+            return cmd_run(args, session)
+        return _action(args, session)
+    finally:
+        game = getattr(session, "sim_game", None)
+        if game is not None:
+            game.save(_sim_state_path(args))
 
 
 def main(argv: list[str] | None = None) -> int:

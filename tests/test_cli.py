@@ -58,3 +58,20 @@ def test_scripted_sim_play(capsys, tmp_path):
     code, envelope = _run(capsys, "--home", str(tmp_path), "sim", "play", "--scripted", "--max-steps", "40")
     assert code == 0, envelope
     assert envelope["data"]["status"] == "success" and envelope["data"]["game"]["state"] == "won"
+
+
+def test_sim_state_persists_across_cli_processes(capsys, tmp_path):
+    common = ["--home", str(tmp_path), "--session", "persist", "--sim"]
+    code, envelope = _run(capsys, *common, "snapshot", "--text")
+    assert code == 0 and envelope["data"]["ref_count"] == 1
+    ref = next(line.split()[0] for line in envelope["data"]["scene"].splitlines() if "[button]" in line)
+    code, envelope = _run(capsys, *common, "click", ref)
+    assert code == 0 and envelope["data"]["disposition"]["delivery"] == "delivered_verified"
+    code, envelope = _run(capsys, *common, "press", "enter")
+    assert code == 0 and envelope["data"]["disposition"]["delivery"] == "delivered_verified"
+    code, envelope = _run(capsys, "--home", str(tmp_path), "--session", "persist", "sim", "status")
+    assert envelope["data"]["game"]["state"] == "playing"
+    code, envelope = _run(capsys, *common, "press", "right")
+    assert envelope["data"]["events"][0]["kind"] == "node_moved"
+    code, envelope = _run(capsys, "--home", str(tmp_path), "--session", "persist", "sim", "reset")
+    assert envelope["data"]["game"]["state"] == "title"
