@@ -30,7 +30,7 @@ agent-play = "agent_play.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-agent_play = ["skills/*.md", "skills/genres/*.md"]
+agent_play = ["skills/*.md", "skills/genres/*.md", "knowledge/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -70,6 +70,13 @@ TOOLS: list[dict[str, Any]] = [
     ),
     _tool("remember", "Save a note to working memory for later steps (a key you found, a rule you learned).", {"note": {"type": "string"}}),
     _tool(
+        "learn",
+        "Save durable knowledge that must survive this run and future sessions: a game's rules, its "
+        "control mapping, a fact the user taught you. It is shown to you at the start of every later run. "
+        "Use remember for things that matter only now.",
+        {"topic": {"type": "string"}, "text": {"type": "string"}},
+    ),
+    _tool(
         "set_objectives",
         "Replace the objective list that decomposes the task. Keep it short; mark progress with status.",
         {

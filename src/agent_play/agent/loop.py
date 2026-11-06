@@ -16,11 +16,14 @@ from agent_play.agent.memory import WorkingMemory
 from agent_play.agent.model import ModelClient, ToolCall
 from agent_play.agent.tools import ACTION_TOOLS, CONTROL_TOOLS, TOOLS
 from agent_play.envelope import AgentPlayError, ErrorCode, Response
+from agent_play.knowledge.anticheat import Assessment, assess
+from agent_play.knowledge.store import KnowledgeStore
 from agent_play.scene.snapshot import Snapshot
 from agent_play.session import Session
 from agent_play.skills import load_skill
 
 OMITTED_FRAME = "[earlier frame omitted to keep the context small]"
+DEFAULT_SKILLS = ["core", "anti_cheat"]
 
 
 @dataclass
@@ -34,6 +37,7 @@ class AgentConfig:
     observe_after_actions: str = "full"
     interactive_only: bool = False
     max_text_turns: int = 2
+    block_protected: bool = False
 
 
 @dataclass
@@ -47,6 +51,7 @@ class RunResult:
     trace_path: str | None = None
     last_snapshot_id: str | None = None
     usage: dict[str, int] = field(default_factory=dict)
+    assessment: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -57,6 +62,7 @@ class RunResult:
             "objectives": [o.to_dict() for o in self.memory.objectives],
             "lessons": list(self.memory.lessons),
             "usage": self.usage,
+            "anticheat": self.assessment,
         }
         if self.question:
             data["question"] = self.question
@@ -76,19 +82,25 @@ class GameAgent:
         skills: list[str] | None = None,
         extra_instructions: str = "",
         log: Any | None = None,
+        knowledge: KnowledgeStore | None = None,
     ) -> None:
         self.session = session
         self.model = model
         self.config = config or AgentConfig()
-        self.skills = skills or ["core"]
+        self.skills = skills or list(DEFAULT_SKILLS)
         self.extra_instructions = extra_instructions
         self.log = log or (lambda _line: None)
+        self.knowledge = knowledge or KnowledgeStore(session.root)
         self.usage: dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0}
+        self._assessment: Assessment | None = None
 
     def system_prompt(self) -> str:
         parts = [load_skill(name) for name in self.skills]
         if self.extra_instructions.strip():
             parts.append("# Instructions for this run\n\n" + self.extra_instructions.strip())
+        learned = self.knowledge.render()
+        if learned.strip():
+            parts.append("# Knowledge you kept from earlier runs\n\n" + learned)
         return "\n\n".join(parts)
 
     def run(self, task: str) -> RunResult:
@@ -97,6 +109,13 @@ class GameAgent:
         trace = self.session.trace
         started = time.monotonic()
         trace.write("run.start", {"task": task, "max_steps": self.config.max_steps})
+        self._assessment = assess(task)
+        trace.write("anticheat.assess", self._assessment.to_dict())
+        if self._assessment.policy in ("refuse", "warn"):
+            memory.add_note("Anti-cheat risk: " + self._assessment.reason)
+            self.log(f"anti-cheat {self._assessment.policy}: {self._assessment.reason}")
+            if self._assessment.policy == "refuse" and self.config.block_protected:
+                return self._finish("blocked_policy", self._assessment.reason, memory, None)
         messages: list[dict[str, Any]] = []
         snapshot = self.session.observe()
         messages.append({"role": "user", "content": self._observation_blocks(snapshot, memory, first=True)})
@@ -185,6 +204,14 @@ class GameAgent:
             if name == "remember":
                 memory.add_note(str(args.get("note", "")))
                 return Response.to_json(Response.ok("remember", {"notes": len(memory.notes)})), False, None
+            if name == "learn":
+                topic = str(args.get("topic", "")).strip() or "notes"
+                text = str(args.get("text", "")).strip()
+                if not text:
+                    raise AgentPlayError(ErrorCode.INVALID_ARGS, "learn needs text")
+                slug = self.knowledge.add(topic, text)
+                self.session.trace.write("knowledge.learn", {"topic": slug})
+                return Response.to_json(Response.ok("learn", {"topic": slug, "topics": self.knowledge.topics()})), False, None
             if name == "set_objectives":
                 memory.set_objectives(list(args.get("objectives", [])))
                 return Response.to_json(Response.ok("set_objectives", {"objectives": [o.to_dict() for o in memory.objectives]})), False, None
@@ -243,6 +270,7 @@ class GameAgent:
             trace_path=str(self.session.trace.path) if self.session.trace.path else None,
             last_snapshot_id=snapshot.snapshot_id if snapshot else None,
             usage=dict(self.usage),
+            assessment=self._assessment.to_dict() if self._assessment else {},
         )
 
 

@@ -80,6 +80,17 @@ def build_parser() -> argparse.ArgumentParser:
     sk_sub.add_parser("list")
     sk_get = sk_sub.add_parser("get")
     sk_get.add_argument("name")
+    ac = sub.add_parser("anticheat", help="Classify a game or task against the anti-cheat registry")
+    ac.add_argument("text", nargs="?", default="")
+    ac.add_argument("--list", action="store_true", help="List the known systems and games")
+    kn = sub.add_parser("knowledge", help="Durable notes the agent keeps across runs")
+    kn_sub = kn.add_subparsers(dest="knowledge_command", required=True)
+    kn_sub.add_parser("list")
+    kn_show = kn_sub.add_parser("show")
+    kn_show.add_argument("topic")
+    kn_add = kn_sub.add_parser("add")
+    kn_add.add_argument("topic")
+    kn_add.add_argument("text")
     sim = sub.add_parser("sim", help="The built-in grid game")
     sim_sub = sim.add_subparsers(dest="sim_command", required=True)
     frame = sim_sub.add_parser("frame", help="Render one frame to a PNG")
@@ -321,6 +332,25 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         if args.skills_command == "list":
             return {"skills": list_skills()}
         return {"name": args.name, "content": load_skill(args.name)}
+    if args.command == "anticheat":
+        from agent_play.knowledge.anticheat import assess, known_games, known_systems
+
+        if args.list or not args.text:
+            return {"systems": known_systems(), "games": known_games()}
+        return assess(args.text).to_dict()
+    if args.command == "knowledge":
+        from agent_play.knowledge.store import KnowledgeStore
+
+        store = KnowledgeStore(_state_root(args))
+        if args.knowledge_command == "list":
+            return {"topics": store.topics(), "dir": str(store.dir)}
+        if args.knowledge_command == "show":
+            text = store.read(args.topic)
+            if text is None:
+                raise AgentPlayError(ErrorCode.INVALID_ARGS, f"No knowledge topic {args.topic!r}", f"Known topics: {', '.join(store.topics()) or 'none'}")
+            return {"topic": args.topic, "content": text}
+        slug = store.add(args.topic, args.text)
+        return {"topic": slug, "topics": store.topics()}
     if args.command == "sim":
         return cmd_sim(args)
     session = build_session(args)
