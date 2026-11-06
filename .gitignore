@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# secrets — never commit
+.env
+.env.local
+
+# runtime state: snapshots, traces, screenshots
+.agent-play/
+sessions/
+*.jsonl
+*.log
+.DS_Store
