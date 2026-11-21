@@ -307,6 +307,13 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         return {"categories": CATEGORIES, "templates": items, "themes": themes, "backgrounds": backgrounds,
                 "screens": screens_info()}
 
+    @app.get("/api/templates/{template_id}/preview", response_class=HTMLResponse, dependencies=[Depends(admin)])
+    def template_preview(template_id: str):
+        """How a template looks with its example content, for the picker thumbnails."""
+        if template_id not in lib.templates:
+            raise HTTPException(404, "תבנית לא קיימת")
+        return render(template_id, lib.defaults(template_id))
+
     def _slide_input(template_id: str, body: dict) -> tuple[dict, int, bool, dict | None, str | None, list | None]:
         try:
             clean = lib.clean(template_id, body.get("data") or {})

@@ -626,3 +626,13 @@ def test_each_screen_reports_its_own_size(admin):
     assert (a["width"], a["live"], a["url"].endswith("/?display&screen=1")) == (1920, True, True)
     assert (b["width"], b["height"], b["live"]) == (3840, 2160, True)
     assert admin.get("/api/settings").json()["display"]["width"] == 1920
+
+
+def test_template_preview_thumbnails_and_bundled_font(client, admin):
+    assert "התפריט שלנו" in admin.get("/api/templates/menu/preview").text
+    assert admin.get("/api/templates/nope/preview").status_code == 404
+    assert admin.get("/static/fonts/heebo.css").status_code == 200
+    assert admin.get("/static/fonts/heebo-hebrew-wght-normal.woff2").status_code == 200
+    assert "/static/fonts/heebo.css" in admin.get("/api/templates/text/preview").text
+    client.cookies.clear()
+    assert client.get("/api/templates/menu/preview").status_code == 401

@@ -5,7 +5,7 @@
   var bar = document.getElementById('bar');
   var heading = document.getElementById('heading');
   var backBtn = document.getElementById('back');
-  var menuBtn = document.getElementById('menu');
+  var tabsEl = document.getElementById('tabs');
   var toastEl = document.getElementById('toast');
   var lib = null;          // {categories, templates, themes}
   var images = [];         // file names in the library
@@ -55,17 +55,58 @@
     });
   }
   function fail(err) { toast(err.message || 'אין חיבור למסך', true); }
-  function screen(title, back, nodes, actions) {
+  /* Line icons, drawn for this project. Constant strings only, never user text. */
+  var ICONS = {
+    back: '<path d="M9 6l6 6-6 6"/>',
+    chev: '<path d="M9 6l6 6-6 6"/>',
+    slides: '<rect x="3" y="5" width="18" height="12" rx="2.5"/><path d="M9 21h6M12 17v4"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5.5-5 4 3.5L16 14l4 4"/>',
+    music: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    play: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.2v5.6l5-2.8z"/>',
+    business: '<path d="M4 10l1.5-5h13L20 10"/><path d="M4 10a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0A2.7 2.7 0 0 0 20 10"/><path d="M5.5 12.5V20h13v-7.5M10 20v-4.5h4V20"/>',
+    lobby: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M10 21v-5h4v5"/>',
+    synagogue: '<path d="M4 21V11a8 8 0 0 1 16 0v10"/><path d="M3 21h18M12 7.2l1.6 2.8h-3.2zM12 12.6L10.4 9.8h3.2z"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/>',
+    general: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/>'
+  };
+  function icon(name) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ic'); svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = ICONS[name];
+    return svg;
+  }
+  backBtn.appendChild(icon('back'));
+
+  var TABS = [['home', 'שקופיות', 'slides'], ['images', 'תמונות', 'image'], ['music', 'מוזיקה', 'music'], ['settings', 'הגדרות', 'settings']];
+  function drawTabs(current) {
+    var go = { home: showHome, images: showImages, music: function () { showMusic(); }, settings: showSettings };
+    tabsEl.textContent = '';
+    TABS.forEach(function (t) {
+      tabsEl.appendChild(h('button', { type: 'button', 'aria-current': t[0] === current ? 'page' : null, onclick: go[t[0]] }, icon(t[2]), h('span', { text: t[1] })));
+    });
+  }
+  /* A top-level screen (tab given): big title, tools at the top, tab bar at the bottom.
+     An inner screen: slim header with a back button, and the main action pinned to the bottom. */
+  function screen(title, back, nodes, actions, tab, lede) {
     heading.textContent = title;
     onBack = back || null;
     backBtn.hidden = !back;
+    bar.hidden = !!tab;
+    tabsEl.hidden = !tab;
     view.textContent = '';
-    append(view, nodes);
-    if (actions) append(view, h('div', { class: 'actions' }, actions));
+    if (tab) {
+      drawTabs(tab);
+      append(view, [h('h1', { class: 'title', text: title }), lede ? h('p', { class: 'lede', text: lede }) : h('p', { class: 'lede' })]);
+      if (actions) append(view, h('div', { class: 'toolbar' }, actions));
+      append(view, nodes);
+    } else {
+      append(view, nodes);
+      if (actions) append(view, h('div', { class: 'actions' }, actions));
+    }
     window.scrollTo(0, 0);
   }
   backBtn.addEventListener('click', function () { if (onBack) onBack(); });
-  menuBtn.addEventListener('click', function () { showSettings(); });
   function templateOf(id) { return lib.templates.filter(function (t) { return t.id === id; })[0]; }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
@@ -82,23 +123,26 @@
 
   // ---------- auth ----------
   function showAuth() {
-    bar.hidden = true;
+    bar.hidden = true; tabsEl.hidden = true;
     api('GET', '/api/auth/state').then(function (s) {
       if (s.logged_in) return s.setup_done ? boot() : onboarding(s.cities);
       var setup = !s.pin_set;
       var pin = h('input', { class: 'pin', type: 'password', inputmode: 'numeric', autocomplete: setup ? 'new-password' : 'current-password', maxlength: '8', id: 'pin', 'aria-describedby': 'pinhelp' });
+      var hero = h('div', { class: 'hero' }, h('div', { class: 'mark' }, icon('slides')),
+        setup ? h('p', { class: 'eyebrow', text: 'שלב 1 מתוך 2' }) : null,
+        h('h1', { text: setup ? 'ברוכים הבאים' : 'שמחים לראות אתכם' }),
+        h('p', { text: setup ? 'בואו נגדיר את המסך שלכם. זה לוקח כשתי דקות.' : 'הקלידו את קוד הכניסה כדי לנהל את המסך.' }));
       var form = h('form', {
         class: 'card', onsubmit: function (e) {
           e.preventDefault();
           api('POST', setup ? '/api/auth/setup' : '/api/auth/login', { pin: pin.value }).then(showAuth).catch(function (err) { pin.value = ''; fail(err); });
         }
       },
-        h('h2', { text: setup ? 'שלב 1 מתוך 2: בחרו קוד כניסה' : 'כניסה לניהול המסך' }),
-        h('p', { class: 'muted', id: 'pinhelp', text: setup ? 'קוד של 4 עד 8 ספרות. רק מי שיודע אותו יוכל לשנות את מה שמוצג.' : 'הקלידו את קוד הכניסה.' }),
-        h('label', { for: 'pin', text: 'קוד' }), pin,
-        h('p', {}), h('button', { class: 'primary', type: 'submit', text: setup ? 'שמירה והמשך' : 'כניסה' }));
+        h('label', { for: 'pin', text: setup ? 'בחרו קוד כניסה' : 'קוד כניסה', style: 'margin-top:0' }), pin,
+        h('p', { class: 'muted', id: 'pinhelp', style: 'margin:10px 0 18px', text: setup ? '4 עד 8 ספרות. רק מי שיודע את הקוד יוכל לשנות את מה שמוצג.' : 'שכחתם? בעל המכשיר יכול לאפס את הקוד.' }),
+        h('button', { class: 'primary big', type: 'submit', text: setup ? 'המשך' : 'כניסה' }));
       view.textContent = '';
-      view.appendChild(form);
+      append(view, [hero, form]);
       pin.focus();
     }).catch(fail);
   }
@@ -116,22 +160,22 @@
       var b = h('button', { type: 'button', class: 'choice', role: 'radio', 'aria-checked': String(k[0] === chosen), onclick: function () {
         chosen = k[0];
         Array.prototype.forEach.call(group.children, function (c) { c.setAttribute('aria-checked', String(c === b)); });
-      } }, h('b', { text: k[1] }), h('span', { text: k[2] }));
+      } }, h('span', { class: 'ico' }, icon(k[0])), h('span', { class: 'tx' }, h('b', { text: k[1] }), h('span', { class: 'sub', text: k[2] })));
       group.appendChild(b);
     });
     view.textContent = '';
+    view.appendChild(h('div', { class: 'hero', style: 'padding-top:20px' }, h('p', { class: 'eyebrow', text: 'שלב 2 מתוך 2' }),
+      h('h1', { text: 'ספרו לנו על המקום' }), h('p', { text: 'לפי התשובות נכין לכם כמה שקופיות מוכנות. את הכול אפשר לשנות אחר כך.' })));
     view.appendChild(h('form', { onsubmit: function (e) {
       e.preventDefault();
       api('POST', '/api/setup', { place: place.value, city: city.value, category: chosen })
         .then(function () { toast('המסך מוכן. עכשיו אפשר לערוך את השקופיות'); boot(); }).catch(fail);
     } },
       h('div', { class: 'card' },
-        h('h2', { text: 'שלב 2 מתוך 2: כמה פרטים על המקום', style: 'margin-top:0' }),
-        h('p', { class: 'muted', text: 'לפי התשובות נכין כמה שקופיות מוכנות. את הכול אפשר לשנות אחר כך.' }),
-        h('label', { for: 'oplace', text: 'שם המקום' }), place,
-        h('label', { for: 'ocity', text: 'עיר' }), city,
-        h('label', { text: 'סוג המקום' }), group),
-      h('button', { class: 'primary', type: 'submit', text: 'סיום והפעלת המסך', style: 'width:100%' })));
+        h('label', { for: 'oplace', text: 'שם המקום', style: 'margin-top:0' }), place,
+        h('label', { for: 'ocity', text: 'עיר' }), city),
+      h('h2', { text: 'איזה מקום זה?', style: 'margin:22px 2px 12px' }), group,
+      h('button', { class: 'primary big', type: 'submit', text: 'סיום והפעלת המסך', style: 'margin-top:8px' })));
     place.focus();
   }
 
@@ -157,11 +201,9 @@
     api('GET', '/api/slides').then(function (slides) {
       var nodes = [];
       if (!slides.length) {
-        nodes.push(h('div', { class: 'card empty' },
+        nodes.push(h('div', { class: 'card empty' }, h('div', { class: 'art' }, icon('slides')),
           h('h2', { text: 'המסך עדיין ריק' }),
-          h('p', { class: 'muted', text: 'בחרו תבנית, מלאו כמה שדות, והיא תופיע על המסך.' })));
-      } else {
-        nodes.push(h('p', { class: 'muted', text: 'השקופיות מוצגות אחת אחרי השנייה, לפי הסדר כאן.' }));
+          h('p', { class: 'muted', text: 'בחרו תבנית, מלאו כמה שדות, והיא תופיע על המסך תוך שניות.' })));
       }
       var many = lib.screens.length > 1;
       function screensText(s) {
@@ -187,17 +229,18 @@
         }
         nodes.push(h('div', { class: 'card slide' },
           frame('/render/' + s.id),
-          h('div', {},
+          h('div', { class: 'body' },
             h('h3', {}, s.data.title || s.template_name, badge),
             h('div', { class: 'meta', text: s.template_name + ' · ' + (templateOf(s.template).wait_end ? 'עד סוף הסרטון' : s.duration + ' שניות') + ' · ' + scheduleText(s.schedule) + (many ? ' · ' + screensText(s) : '') }),
             h('div', { class: 'btns' },
-              h('button', { class: 'small', text: 'עריכה', onclick: function () { editSlide(s); } }),
+              h('button', { class: 'small primary grow', text: 'עריכה', onclick: function () { editSlide(s); } }),
               h('button', { class: 'small', text: s.enabled ? 'כיבוי' : 'הפעלה', onclick: function () {
                 api('PUT', '/api/slides/' + s.id, { data: s.data, duration: s.duration, schedule: s.schedule, expires: s.expires, screens: s.screens, enabled: !s.enabled }).then(showHome).catch(fail);
               } }),
               h('button', { class: 'small', text: 'שכפול', onclick: function () {
                 api('POST', '/api/slides/' + s.id + '/copy').then(function () { toast('שוכפלה'); showHome(); }).catch(fail);
-              } }),
+              } })),
+            h('div', { class: 'btns minor' },
               h('button', { class: 'small', 'aria-label': 'העבר למעלה', text: '▲', disabled: i === 0, onclick: function () { move(-1); } }),
               h('button', { class: 'small', 'aria-label': 'העבר למטה', text: '▼', disabled: i === slides.length - 1, onclick: function () { move(1); } }),
               h('button', { class: 'small danger', text: 'מחיקה', onclick: function () {
@@ -207,32 +250,40 @@
               } })))));
       });
       screen('המסך שלי', null, nodes, [
-        h('button', { text: 'תמונות', onclick: showImages }),
-        h('button', { text: 'מוזיקה', onclick: function () { showMusic(); } }),
-        h('button', { class: 'primary', text: '+ שקופית חדשה', onclick: wizardCategory })]);
+        h('button', { class: 'primary big', text: '+ שקופית חדשה', onclick: wizardCategory })], 'home',
+        slides.length ? 'השקופיות מוצגות אחת אחרי השנייה, לפי הסדר כאן.' : '');
     }).catch(fail);
   }
 
   // ---------- wizard ----------
+  var STEP_NAMES = ['המקום', 'התבנית', 'התוכן', 'פרסום'];
   function steps(n) {
-    var el = h('div', { class: 'steps', role: 'img', 'aria-label': 'שלב ' + n + ' מתוך 4' });
-    for (var i = 1; i <= 4; i++) el.appendChild(h('i', { class: i <= n ? 'on' : '' }));
-    return el;
+    var barEl = h('div', { class: 'steps' });
+    for (var i = 1; i <= 4; i++) barEl.appendChild(h('i', { class: i <= n ? 'on' : '' }));
+    return h('div', { class: 'stepper', role: 'img', 'aria-label': 'שלב ' + n + ' מתוך 4: ' + STEP_NAMES[n - 1] },
+      h('div', { class: 'lbl' }, h('b', { text: 'שלב ' + n + ' מתוך 4' }), h('span', { text: STEP_NAMES[n - 1] })), barEl);
   }
   function wizardCategory() {
-    screen('מה המקום?', showHome, [steps(1), lib.categories.map(function (c) {
-      return h('button', { class: 'choice', onclick: function () { wizardTemplate(c); } },
-        h('b', { text: c.name }), h('span', { text: c.hint }));
-    })]);
+    screen('שקופית חדשה', showHome, [steps(1), h('h1', { class: 'title', text: 'למי השקופית?' }),
+      h('p', { class: 'lede', text: 'נציע תבניות שמתאימות למקום.' }),
+      lib.categories.map(function (c) {
+        return h('button', { class: 'choice', onclick: function () { wizardTemplate(c); } },
+          h('span', { class: 'ico' }, icon(c.id)), h('span', { class: 'tx' }, h('b', { text: c.name }), h('span', { class: 'sub', text: c.hint })),
+          h('span', { class: 'chev' }, icon('chev')));
+      })]);
   }
   function wizardTemplate(cat) {
     var list = lib.templates.filter(function (t) { return t.categories.indexOf(cat.id) >= 0; });
-    screen('מה להציג?', wizardCategory, [steps(2), list.map(function (t) {
-      return h('button', { class: 'choice', onclick: function () {
-        var draft = { template: t.id, data: clone(t.defaults), duration: 12, enabled: true, schedule: null };
-        editFields(draft, function () { wizardTemplate(cat); });
-      } }, h('b', { text: t.name }), h('span', { text: t.description }));
-    })]);
+    screen('שקופית חדשה', wizardCategory, [steps(2), h('h1', { class: 'title', text: 'בחרו תבנית' }),
+      h('p', { class: 'lede', text: 'כך היא נראית על המסך. את הטקסט והצבעים תשנו בשלב הבא.' }),
+      h('div', { class: 'tpls' }, list.map(function (t) {
+        return h('button', { class: 'tpl', 'aria-label': t.name + ': ' + t.description, onclick: function () {
+          var draft = { template: t.id, data: clone(t.defaults), duration: 12, enabled: true, schedule: null };
+          editFields(draft, function () { wizardTemplate(cat); });
+        } }, t.background === false
+          ? h('span', { class: 'frame ph' }, icon(t.id === 'video' ? 'play' : 'image'))   // nothing to preview until a file is chosen
+          : frame('/api/templates/' + t.id + '/preview'), h('span', { class: 'cap' }, h('b', { text: t.name }), h('span', { text: t.description })));
+      }))]);
   }
   function editSlide(s) {
     editFields({ id: s.id, template: s.template, data: clone(s.data), duration: s.duration, enabled: s.enabled, schedule: s.schedule, expires: s.expires, screens: s.screens }, showHome);
@@ -453,7 +504,8 @@
       var duration = h('input', { type: 'number', id: 'dur', inputmode: 'numeric', min: '5', max: '600', value: draft.duration });
 
       var waitEnd = !!templateOf(draft.template).wait_end;
-      screen('כך זה ייראה', back, [steps(4), frame(null, html),
+      var pv = frame(null, html); pv.className += ' hero-frame';
+      screen('תצוגה מקדימה', back, [steps(4), pv,
         waitEnd ? h('p', { class: 'muted', text: 'הסרטון מתנגן עד סופו, ואז עוברים לשקופית הבאה.', style: 'margin-top:12px' }) : [h('label', { for: 'dur', text: 'כמה שניות להציג לפני המעבר לשקופית הבאה' }), duration],
         h('div', { class: 'check' }, always, h('label', { for: 'always', text: 'להציג תמיד', style: 'margin:0' })),
         schedBox,
@@ -482,7 +534,7 @@
   function showImages() {
     api('GET', '/api/images').then(function (list) {
       images = list;
-      var nodes = [h('p', { class: 'muted', text: 'התמונות שהעליתם. אפשר להשתמש בהן בכל שקופית.' })];
+      var nodes = [];
       if (!images.length) nodes.push(h('div', { class: 'card empty' }, h('p', { class: 'muted', text: 'עוד אין תמונות.' })));
       nodes.push(h('div', { class: 'pics' }, images.map(function (name) {
         return h('button', { type: 'button', class: 'pic', 'aria-label': 'מחיקת תמונה', onclick: function () {
@@ -492,7 +544,7 @@
         } }, h('img', { src: '/uploads/' + name, alt: '', loading: 'lazy' }));
       })));
       if (images.length) nodes.push(h('p', { class: 'muted', text: 'לחיצה על תמונה מוחקת אותה (אחרי אישור).', style: 'margin-top:12px' }));
-      screen('תמונות', showHome, nodes, [h('button', { text: 'ייבוא מ-Canva', onclick: showCanva }), uploadButton('העלאת תמונות', showImages)]);
+      screen('תמונות', null, nodes, [h('button', { text: 'ייבוא מ-Canva', onclick: showCanva }), uploadButton('העלאת תמונות', showImages)], 'images', 'התמונות שהעליתם. אפשר להשתמש בהן בכל שקופית.');
     }).catch(fail);
   }
 
@@ -539,7 +591,7 @@
         h('p', { class: 'muted', style: 'margin-top:6px', text: 'כתובת של שידור ישיר (stream) שמסתיימת בדרך כלל ב-mp3 או aac, ולא כתובת של אתר התחנה. דורש אינטרנט.' }));
       function sync() { songs.hidden = m.mode !== 'playlist'; station.hidden = m.mode !== 'radio'; }
       sync();
-      screen('מוזיקת רקע', showHome, [
+      screen('מוזיקת רקע', null, [
         h('div', { class: 'card', role: 'radiogroup', 'aria-label': 'מה לנגן' },
           radio('off', 'בלי מוזיקה', 'המסך שקט'),
           radio('playlist', 'השירים שלי', 'קבצים שהעליתם, מתנגנים בלולאה. עובד גם בלי אינטרנט'),
@@ -549,10 +601,10 @@
           h('label', { for: 'vol', style: 'margin-top:0' }, 'עוצמה: ', volText), volume,
           h('p', { class: 'muted', style: 'margin-top:8px', text: 'כשמוצג סרטון עם קול, המוזיקה נעצרת וחוזרת אחריו.' })),
         h('p', { class: 'muted', text: 'שימו לב: השמעת מוזיקה במקום ציבורי או בעסק דורשת בדרך כלל רישיון מארגוני הזכויות (כמו אקו"ם), גם כשמדובר ברדיו.' })
-      ], [h('button', { class: 'primary', text: 'שמירה', onclick: function () {
+      , h('button', { class: 'primary big', text: 'שמירה', onclick: function () {
         api('PUT', '/api/music', { mode: m.mode, volume: parseInt(volume.value, 10), shuffle: shuffle.checked, radio_name: rname.value, radio_url: rurl.value })
-          .then(function () { toast('נשמר. המסך יתעדכן תוך כמה שניות'); showHome(); }).catch(fail);
-      } })]);
+          .then(function () { toast('נשמר. המסך יתעדכן תוך כמה שניות'); showMusic(); }).catch(fail);
+      } })], null, 'music', 'מה יתנגן ברקע בזמן שהמסך מציג.');
     }).catch(fail);
   }
 
@@ -658,7 +710,7 @@
       city.value = s.city;
       var oldPin = h('input', { id: 'old', class: 'ltr', type: 'password', inputmode: 'numeric', maxlength: '8', autocomplete: 'current-password' });
       var newPin = h('input', { id: 'new', class: 'ltr', type: 'password', inputmode: 'numeric', maxlength: '8', autocomplete: 'new-password' });
-      screen('הגדרות', showHome, [
+      screen('הגדרות', null, [
         h('div', { class: 'card' },
           h('label', { for: 'place', text: 'שם המקום', style: 'margin-top:0' }), place,
           h('p', { class: 'muted', text: 'מופיע בקטן בפינת המסך. אפשר להשאיר ריק.', style: 'margin-top:6px' }),
@@ -682,7 +734,7 @@
             api('POST', '/api/auth/pin', { old: oldPin.value, new: newPin.value }).then(function () { oldPin.value = newPin.value = ''; toast('הקוד הוחלף'); }).catch(fail);
           } })),
         h('button', { class: 'danger', text: 'יציאה', onclick: function () { api('POST', '/api/auth/logout').then(showAuth).catch(fail); } })
-      ]);
+      ], null, 'settings');
     }).catch(fail);
   }
 
