@@ -569,3 +569,60 @@ def test_first_run_wizard_builds_a_working_screen(client, category, count):
 def test_existing_screens_skip_the_wizard(admin):
     admin.post("/api/slides", json={"template": "text"})
     assert admin.get("/api/auth/state").json()["setup_done"] is True
+
+
+# ---------- several screens ----------
+def test_one_screen_by_default(admin):
+    assert [s["name"] for s in admin.get("/api/screens").json()] == ["מסך ראשי"]
+    pl = admin.get("/api/playlist").json()
+    assert pl["screen"] == {"id": 1, "name": "מסך ראשי", "count": 1} and pl["identify"] is False
+    assert admin.post("/api/slides", json={"template": "text", "screens": [2]}).status_code == 400   # no such screen
+
+
+def test_slides_go_to_chosen_screens(admin):
+    assert admin.put("/api/screens", json={"names": []}).status_code == 400
+    assert admin.put("/api/screens", json={"names": ["x"] * 9}).status_code == 400
+    names = [s["name"] for s in admin.put("/api/screens", json={"names": ["קופה", "", "חלון ראווה"]}).json()]
+    assert names == ["קופה", "מסך 2", "חלון ראווה"]
+    everywhere = admin.post("/api/slides", json={"template": "text"}).json()
+    only2 = admin.post("/api/slides", json={"template": "text", "screens": [2]}).json()
+    two = admin.post("/api/slides", json={"template": "text", "screens": [3, 1, 3]}).json()
+    alls = admin.post("/api/slides", json={"template": "text", "screens": [1, 2, 3]}).json()
+    assert everywhere["screens"] is None and only2["screens"] == [2] and two["screens"] == [1, 3] and alls["screens"] is None
+    for bad in ([0], [4], ["1"], [True], "1"):
+        assert admin.post("/api/slides", json={"template": "text", "screens": bad}).status_code == 400, bad
+
+    def ids(screen):
+        return [s["id"] for s in admin.get(f"/api/playlist?screen={screen}").json()["slides"]]
+    assert ids(1) == [everywhere["id"], two["id"], alls["id"]]
+    assert ids(2) == [everywhere["id"], only2["id"], alls["id"]]
+    assert ids(3) == [everywhere["id"], two["id"], alls["id"]]
+    assert ids("junk") == ids(1) and ids(99) == ids(1)                      # unknown screen behaves as the main one
+    assert admin.get("/api/playlist?screen=2").json()["screen"] == {"id": 2, "name": "מסך 2", "count": 3}
+    assert admin.post(f"/api/slides/{only2['id']}/copy").json()["screens"] == [2]
+
+    # removing screens: slides that pointed only at a removed screen fall back to every screen
+    admin.put("/api/screens", json={"names": ["קופה"]})
+    by_id = {s["id"]: s["screens"] for s in admin.get("/api/slides").json()}
+    assert by_id[only2["id"]] is None and by_id[two["id"]] == [1]
+
+
+def test_music_only_on_main_screen_and_identify(admin):
+    admin.put("/api/screens", json={"names": ["א", "ב"]})
+    admin.put("/api/music", json={"mode": "radio", "radio_url": "https://stream.example.org/a.mp3"})
+    assert admin.get("/api/playlist?screen=1").json()["music"]["mode"] == "radio"
+    assert admin.get("/api/playlist?screen=2").json()["music"] == {"mode": "off"}
+    assert admin.post("/api/screens/identify").json()["ok"]
+    assert admin.get("/api/playlist?screen=2").json()["identify"] is True
+    admin.cookies.clear()
+    assert admin.post("/api/screens/identify").status_code == 401 and admin.put("/api/screens", json={"names": ["x"]}).status_code == 401
+
+
+def test_each_screen_reports_its_own_size(admin):
+    admin.put("/api/screens", json={"names": ["א", "ב"]})
+    admin.post("/api/display", json={"screen": 1, "width": 1920, "height": 1080})
+    admin.post("/api/display", json={"screen": 2, "width": 3840, "height": 2160})
+    a, b = admin.get("/api/screens").json()
+    assert (a["width"], a["live"], a["url"].endswith("/?display&screen=1")) == (1920, True, True)
+    assert (b["width"], b["height"], b["live"]) == (3840, 2160, True)
+    assert admin.get("/api/settings").json()["display"]["width"] == 1920

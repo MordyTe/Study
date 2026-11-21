@@ -10,6 +10,7 @@
   var lib = null;          // {categories, templates, themes}
   var images = [];         // file names in the library
   var onBack = null;
+  var screenFilter = 0;    // 0 = show slides of every screen
   var DAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 
   // ---------- helpers ----------
@@ -162,7 +163,19 @@
       } else {
         nodes.push(h('p', { class: 'muted', text: 'השקופיות מוצגות אחת אחרי השנייה, לפי הסדר כאן.' }));
       }
+      var many = lib.screens.length > 1;
+      function screensText(s) {
+        if (!s.screens) return 'כל המסכים';
+        return s.screens.map(function (n) { return (lib.screens[n - 1] || {}).name || 'מסך ' + n; }).join(', ');
+      }
+      if (many && slides.length) {
+        nodes.push(h('div', { class: 'days', role: 'group', 'aria-label': 'סינון לפי מסך', style: 'margin-bottom:12px' },
+          [{ id: 0, name: 'כל המסכים' }].concat(lib.screens).map(function (sc) {
+            return h('button', { type: 'button', text: sc.name, 'aria-pressed': String(screenFilter === sc.id), onclick: function () { screenFilter = sc.id; showHome(); } });
+          })));
+      }
       slides.forEach(function (s, i) {
+        if (many && screenFilter && s.screens && s.screens.indexOf(screenFilter) < 0) return;
         var badge = s.expired ? h('span', { class: 'badge off', text: 'פג תוקף' })
           : !s.enabled ? h('span', { class: 'badge off', text: 'כבויה' })
           : s.active_now ? h('span', { class: 'badge on', text: 'מוצגת עכשיו' })
@@ -176,11 +189,11 @@
           frame('/render/' + s.id),
           h('div', {},
             h('h3', {}, s.data.title || s.template_name, badge),
-            h('div', { class: 'meta', text: s.template_name + ' · ' + (templateOf(s.template).wait_end ? 'עד סוף הסרטון' : s.duration + ' שניות') + ' · ' + scheduleText(s.schedule) }),
+            h('div', { class: 'meta', text: s.template_name + ' · ' + (templateOf(s.template).wait_end ? 'עד סוף הסרטון' : s.duration + ' שניות') + ' · ' + scheduleText(s.schedule) + (many ? ' · ' + screensText(s) : '') }),
             h('div', { class: 'btns' },
               h('button', { class: 'small', text: 'עריכה', onclick: function () { editSlide(s); } }),
               h('button', { class: 'small', text: s.enabled ? 'כיבוי' : 'הפעלה', onclick: function () {
-                api('PUT', '/api/slides/' + s.id, { data: s.data, duration: s.duration, schedule: s.schedule, expires: s.expires, enabled: !s.enabled }).then(showHome).catch(fail);
+                api('PUT', '/api/slides/' + s.id, { data: s.data, duration: s.duration, schedule: s.schedule, expires: s.expires, screens: s.screens, enabled: !s.enabled }).then(showHome).catch(fail);
               } }),
               h('button', { class: 'small', text: 'שכפול', onclick: function () {
                 api('POST', '/api/slides/' + s.id + '/copy').then(function () { toast('שוכפלה'); showHome(); }).catch(fail);
@@ -222,7 +235,7 @@
     })]);
   }
   function editSlide(s) {
-    editFields({ id: s.id, template: s.template, data: clone(s.data), duration: s.duration, enabled: s.enabled, schedule: s.schedule, expires: s.expires }, showHome);
+    editFields({ id: s.id, template: s.template, data: clone(s.data), duration: s.duration, enabled: s.enabled, schedule: s.schedule, expires: s.expires, screens: s.screens }, showHome);
   }
 
   // ---------- step 3: content ----------
@@ -416,6 +429,26 @@
       append(schedBox, [h('label', { text: 'באילו ימים' }), days,
         h('div', { class: 'two' }, h('div', {}, h('label', { for: 'start', text: 'משעה' }), start), h('div', {}, h('label', { for: 'end', text: 'עד שעה' }), end))]);
       always.addEventListener('change', function () { schedBox.hidden = always.checked; });
+      var chosen = draft.screens ? draft.screens.slice() : null;      // null = every screen
+      var screensBox = null;
+      if (lib.screens.length > 1) {
+        var each = h('div', { class: 'days', role: 'group', 'aria-label': 'מסכים', hidden: !chosen });
+        var allScreens = h('input', { type: 'checkbox', id: 'allsc', checked: !chosen });
+        lib.screens.forEach(function (sc) {
+          var b = h('button', { type: 'button', text: sc.name, 'aria-pressed': String(!!chosen && chosen.indexOf(sc.id) >= 0), onclick: function () {
+            var at = chosen.indexOf(sc.id);
+            if (at >= 0) chosen.splice(at, 1); else chosen.push(sc.id);
+            b.setAttribute('aria-pressed', String(at < 0));
+          } });
+          each.appendChild(b);
+        });
+        allScreens.addEventListener('change', function () {
+          chosen = allScreens.checked ? null : [];
+          each.hidden = allScreens.checked;
+          Array.prototype.forEach.call(each.children, function (c) { c.setAttribute('aria-pressed', 'false'); });
+        });
+        screensBox = [h('div', { class: 'check' }, allScreens, h('label', { for: 'allsc', text: 'להציג בכל המסכים', style: 'margin:0' })), each];
+      }
       var expires = h('input', { type: 'date', id: 'exp', value: draft.expires || '' });
       var duration = h('input', { type: 'number', id: 'dur', inputmode: 'numeric', min: '5', max: '600', value: draft.duration });
 
@@ -424,17 +457,20 @@
         waitEnd ? h('p', { class: 'muted', text: 'הסרטון מתנגן עד סופו, ואז עוברים לשקופית הבאה.', style: 'margin-top:12px' }) : [h('label', { for: 'dur', text: 'כמה שניות להציג לפני המעבר לשקופית הבאה' }), duration],
         h('div', { class: 'check' }, always, h('label', { for: 'always', text: 'להציג תמיד', style: 'margin:0' })),
         schedBox,
+        screensBox,
         h('label', { for: 'exp', text: 'להציג עד תאריך (לא חובה)' }), expires,
         h('p', { class: 'muted', text: 'אחרי התאריך הזה השקופית יורדת מהמסך לבד. מתאים למבצעים ולהודעות זמניות.', style: 'margin-top:6px' })
       ], [
         h('button', { text: 'חזרה לעריכה', onclick: back }),
         h('button', { class: 'primary', text: draft.id ? 'שמירה' : 'פרסום למסך', onclick: function () {
           if (!always.checked && !sched.days.length) return toast('בחרו לפחות יום אחד', true);
+          if (chosen && !chosen.length) return toast('בחרו לפחות מסך אחד', true);
           var body = {
             template: draft.template, data: draft.data, enabled: draft.enabled,
             duration: parseInt(duration.value, 10) || 12,
             schedule: always.checked ? null : { days: sched.days, start: start.value, end: end.value },
-            expires: expires.value || null
+            expires: expires.value || null,
+            screens: chosen
           };
           var req = draft.id ? api('PUT', '/api/slides/' + draft.id, body) : api('POST', '/api/slides', body);
           req.then(function () { toast(draft.id ? 'נשמר. המסך יתעדכן תוך כמה שניות' : 'פורסם. יופיע על המסך תוך כמה שניות'); showHome(); }).catch(fail);
@@ -579,6 +615,41 @@
     return card;
   }
 
+  // ---------- screens ----------
+  function screensCard() {
+    var card = h('div', { class: 'card' });
+    function draw(list) {
+      lib.screens = list;
+      var names = list.map(function (sc) { return sc.name; });
+      card.textContent = '';
+      append(card, [h('h2', { text: list.length > 1 ? 'המסכים' : 'המסך', style: 'margin-top:0' }),
+        list.map(function (sc, i) {
+          var inp = h('input', { type: 'text', maxlength: '30', value: sc.name, 'aria-label': 'שם מסך ' + sc.id });
+          inp.addEventListener('input', function () { names[i] = inp.value; });
+          var status = sc.live ? sc.width + ' × ' + sc.height + ' פיקסלים, פעיל' : (sc.width ? 'לא פעיל כרגע' : 'עוד לא חובר');
+          return h('div', { class: 'rowedit' },
+            h('div', { style: 'display:flex;gap:8px;align-items:center' }, h('b', { text: String(sc.id), style: 'min-width:1.2em' }), inp,
+              list.length > 1 && i === list.length - 1 ? h('button', { type: 'button', class: 'small danger', text: 'הסרה', onclick: function () {
+                if (confirm('להסיר את "' + sc.name + '"? שקופיות ששויכו רק אליו יחזרו לכל המסכים.')) save(names.slice(0, -1));
+              } }) : null),
+            h('div', { class: 'muted', text: status }),
+            sc.id > 1 && sc.url ? h('div', { class: 'muted' }, 'לפתוח בדפדפן של המסך הזה: ', h('span', { class: 'ltr', style: 'display:block', text: sc.url.replace('http://', '') })) : null);
+        }),
+        h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+          h('button', { type: 'button', text: 'שמירת שמות', onclick: function () { save(names); } }),
+          list.length < 8 ? h('button', { type: 'button', text: '+ מסך נוסף', onclick: function () { save(names.concat(['מסך ' + (names.length + 1)])); } }) : null,
+          list.length > 1 ? h('button', { type: 'button', text: 'איזה מסך הוא מי?', onclick: function () {
+            api('POST', '/api/screens/identify').then(function (r) { toast('כל מסך מציג עכשיו את המספר שלו ל-' + r.seconds + ' שניות'); }).catch(fail);
+          } }) : null),
+        h('p', { class: 'muted', style: 'margin-top:10px', text: list.length > 1
+          ? 'כשיוצרים או עורכים שקופית בוחרים באילו מסכים היא תוצג. מוזיקת הרקע מתנגנת רק במסך 1.'
+          : 'הרזולוציה מזוהה אוטומטית מהמסך. מפצל HDMI מציג את אותה תמונה בכל המסכים ואין מה להגדיר. כדי להציג תוכן שונה במסך אחר, הוסיפו מסך.' })]);
+    }
+    function save(names) { api('PUT', '/api/screens', { names: names }).then(function (list) { toast('נשמר'); draw(list); }).catch(fail); }
+    api('GET', '/api/screens').then(draw).catch(fail);
+    return card;
+  }
+
   // ---------- settings ----------
   function showSettings() {
     api('GET', '/api/settings').then(function (s) {
@@ -596,10 +667,7 @@
           h('button', { class: 'primary', text: 'שמירה', onclick: function () {
             api('PUT', '/api/settings', { place: place.value, city: city.value }).then(function () { toast('נשמר'); }).catch(fail);
           } })),
-        h('div', { class: 'card' },
-          h('h2', { text: 'המסך המחובר', style: 'margin-top:0' }),
-          h('p', { text: s.display ? s.display.width + ' × ' + s.display.height + ' פיקסלים' + (s.display.live ? '' : ' (התצוגה לא פעילה כרגע)') : 'התצוגה עוד לא נפתחה על המסך.' }),
-          h('p', { class: 'muted', text: 'הרזולוציה מזוהה אוטומטית מהמסך דרך ה-HDMI, והשקופיות מתאימות את עצמן לכל גודל. אין מה להגדיר.' })),
+        screensCard(),
         h('div', { class: 'card' },
           h('h2', { text: 'כתובת דף הניהול', style: 'margin-top:0' }),
           h('p', { class: 'ltr', text: s.admin_url }),

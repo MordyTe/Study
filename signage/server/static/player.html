@@ -14,6 +14,10 @@ iframe.on{opacity:1}
 #setup h1{font-size:8vh;margin:0 0 3vh}
 #setup p{font-size:4vh;margin:0 0 2vh;opacity:.85}
 #chip{position:absolute;bottom:2vh;right:2vw;background:rgba(0,0,0,.72);color:#fff;padding:1vh 1.4vw;border-radius:1.2vh;font-size:2.6vh;direction:ltr;z-index:5}
+#who{position:absolute;inset:0;z-index:9;background:rgba(15,23,42,.94);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#who[hidden]{display:none}
+#who-n{font-size:46vh;font-weight:800;line-height:1;color:#fbbf24}
+#who-name{font-size:9vh;font-weight:700}
 #setup .url{font-size:4.6vh;color:#fbbf24;direction:ltr;text-align:right;font-weight:700}
 </style>
 </head>
@@ -30,11 +34,13 @@ iframe.on{opacity:1}
   </div>
 </div>
 <div id="chip" hidden></div>
+<div id="who" hidden><div id="who-n"></div><div id="who-name"></div></div>
 <script>
 (function(){
   var frames=[document.getElementById('a'),document.getElementById('b')], front=0;
   var slides=[], version=null, index=-1, timer=null, shownAt=0;
   var setup=document.getElementById('setup'), shownUrl='', bootedAt=Date.now();
+  var screenNo=parseInt(new URLSearchParams(location.search).get('screen'),10)||1;
   function text(id,t){ document.getElementById(id).textContent=t; }
   var MAX_VIDEO=20*60*1000;       // safety net if a video never reports that it ended
   var REFRESH_SINGLE=10*60*1000;  // one slide only: reload so computed times stay current
@@ -91,10 +97,13 @@ iframe.on{opacity:1}
   }
 
   function poll(){
-    fetch('/api/playlist',{cache:'no-store'}).then(function(r){return r.json()}).then(function(p){
+    fetch('/api/playlist?screen='+screenNo,{cache:'no-store'}).then(function(r){return r.json()}).then(function(p){
       var changed = p.version!==version || JSON.stringify(p.slides)!==JSON.stringify(slides);
       version=p.version; slides=p.slides;
       setMusic(p.music||{mode:'off'});
+      var who=document.getElementById('who'), many=p.screen && p.screen.count>1;
+      who.hidden=!p.identify;
+      if(p.identify){ text('who-n', p.screen.id); text('who-name', p.screen.name); }
       var chip=document.getElementById('chip');
       if(!slides.length){
         clearTimeout(timer); index=-1;
@@ -104,7 +113,7 @@ iframe.on{opacity:1}
           text('s-title','ממתין לחיבור לרשת'); text('s-line','חברו את המכשיר לנתב בכבל רשת.');
           text('url',''); text('s-foot','הכתובת תופיע כאן לבד ברגע שהמכשיר יתחבר.'); qr.hidden=true; shownUrl='';
         } else {
-          text('s-title', p.setup_done ? 'המסך ריק' : 'ברוכים הבאים');
+          text('s-title', p.setup_done ? (many ? p.screen.name+': אין מה להציג' : 'המסך ריק') : 'ברוכים הבאים');
           text('s-line', p.setup_done ? 'כדי להוסיף תוכן, פתחו בטלפון או במחשב:' : 'כדי להגדיר את המסך, סרקו את הקוד או פתחו בטלפון:');
           text('url', p.admin_url.replace('http://','')); text('s-foot','הטלפון צריך להיות מחובר לאותה רשת.');
           if(p.admin_url!==shownUrl){ shownUrl=p.admin_url; qr.src='/api/qr.svg?t='+Date.now(); }   // address changed: new code
@@ -126,10 +135,12 @@ iframe.on{opacity:1}
   });
   function report(){
     fetch('/api/display',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({width:Math.round(innerWidth*devicePixelRatio),height:Math.round(innerHeight*devicePixelRatio)})}).catch(function(){});
+      body:JSON.stringify({screen:screenNo,width:Math.round(innerWidth*devicePixelRatio),height:Math.round(innerHeight*devicePixelRatio)})}).catch(function(){});
   }
   report(); setInterval(report, 15000); window.addEventListener('resize', report);
   poll(); setInterval(poll, 5000);
+  // while the owner is telling screens apart, check more often so the numbers appear quickly
+  setInterval(function(){ if(!document.getElementById('who').hidden) poll(); }, 2000);
 })();
 </script>
 </body>

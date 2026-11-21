@@ -31,6 +31,8 @@ class Store:
             columns = {row["name"] for row in db.execute("PRAGMA table_info(slides)")}
             if "expires" not in columns:  # databases created before slides could expire
                 db.execute("ALTER TABLE slides ADD COLUMN expires TEXT")
+            if "screens" not in columns:  # NULL = every screen, otherwise a JSON list of screen numbers
+                db.execute("ALTER TABLE slides ADD COLUMN screens TEXT")
 
     @contextmanager
     def _db(self):
@@ -89,6 +91,7 @@ class Store:
             "enabled": bool(row["enabled"]),
             "schedule": json.loads(row["schedule"]) if row["schedule"] else None,
             "expires": row["expires"],
+            "screens": json.loads(row["screens"]) if row["screens"] else None,
         }
 
     def slides(self) -> list[dict]:
@@ -102,27 +105,31 @@ class Store:
         return self._slide(row) if row else None
 
     def add_slide(self, template: str, data: dict, duration: int, enabled: bool, schedule: dict | None,
-                  expires: str | None = None) -> int:
+                  expires: str | None = None, screens: list[int] | None = None) -> int:
         with self._db() as db:
             pos = db.execute("SELECT COALESCE(MAX(position),0)+1 FROM slides").fetchone()[0]
             cur = db.execute(
-                "INSERT INTO slides(template,data,duration,enabled,schedule,position,expires) VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO slides(template,data,duration,enabled,schedule,position,expires,screens) VALUES(?,?,?,?,?,?,?,?)",
                 (template, json.dumps(data, ensure_ascii=False), duration, int(enabled),
-                 json.dumps(schedule) if schedule else None, pos, expires),
+                 json.dumps(schedule) if schedule else None, pos, expires, json.dumps(screens) if screens else None),
             )
             new_id = cur.lastrowid
         self.bump()
         return new_id
 
     def update_slide(self, slide_id: int, data: dict, duration: int, enabled: bool, schedule: dict | None,
-                     expires: str | None = None) -> None:
+                     expires: str | None = None, screens: list[int] | None = None) -> None:
         with self._db() as db:
             db.execute(
-                "UPDATE slides SET data=?, duration=?, enabled=?, schedule=?, expires=? WHERE id=?",
+                "UPDATE slides SET data=?, duration=?, enabled=?, schedule=?, expires=?, screens=? WHERE id=?",
                 (json.dumps(data, ensure_ascii=False), duration, int(enabled),
-                 json.dumps(schedule) if schedule else None, expires, slide_id),
+                 json.dumps(schedule) if schedule else None, expires, json.dumps(screens) if screens else None, slide_id),
             )
         self.bump()
+
+    def set_slide_screens(self, slide_id: int, screens: list[int] | None) -> None:
+        with self._db() as db:
+            db.execute("UPDATE slides SET screens=? WHERE id=?", (json.dumps(screens) if screens else None, slide_id))
 
     def delete_slide(self, slide_id: int) -> None:
         with self._db() as db:

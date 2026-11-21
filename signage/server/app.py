@@ -33,6 +33,8 @@ MAX_VIDEO = 300 * 1024 * 1024
 MAX_AUDIO = 50 * 1024 * 1024
 AUDIO_NAME = re.compile(r"^[0-9a-f]{16}\.(mp3|ogg|m4a|wav)$")
 MUSIC_OFF = {"mode": "off", "volume": 40, "shuffle": True, "radio_name": "", "radio_url": ""}
+MAX_SCREENS = 8
+IDENTIFY_SECONDS = 20
 MAX_SIDE = 2560
 MAX_FAILS, LOCK_SECONDS = 5, 60
 
@@ -86,7 +88,8 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
     lib = Library()
     port = int(os.environ.get("SIGNAGE_PORT", "8080"))
     fails = {"count": 0, "locked_until": 0.0}
-    display: dict = {}
+    display: dict[int, dict] = {}     # screen number -> last reported size
+    identify = {"until": 0.0}
     # Canva only accepts redirect URLs registered in advance; a LAN address cannot be one.
     canva = Canva(store, os.environ.get("SIGNAGE_CANVA_REDIRECT") or f"http://127.0.0.1:{port}/api/canva/callback",
                   transport=canva_transport, sleep=(lambda s: None) if canva_transport else time.sleep)
@@ -182,7 +185,8 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
 
     @app.get("/api/settings", dependencies=[Depends(admin)])
     def get_settings():
-        shown = {**display, "live": time.time() - display["seen"] < 30} if display else None
+        first = display.get(1)
+        shown = {**first, "live": time.time() - first["seen"] < 30} if first else None
         return {**settings(), "cities": list(zmanim.CITIES), "admin_url": admin_url() + "/admin" if admin_url() else "",
                 "display": shown}
 
@@ -197,6 +201,61 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         store.set("city", body["city"])
         store.bump()
         return settings()
+
+    # --- screens ------------------------------------------------------------
+    # One device can feed several screens: a second HDMI output, or any other device with a
+    # browser that opens this server with ?screen=N. Each slide goes to all screens or to chosen ones.
+    def screen_names() -> list[str]:
+        try:
+            names = json.loads(store.get("screens") or "[]")
+        except ValueError:
+            names = []
+        return names or ["מסך ראשי"]
+
+    def screen_number(raw) -> int:
+        try:
+            n = int(raw)
+        except (TypeError, ValueError):
+            return 1
+        return n if 1 <= n <= len(screen_names()) else 1
+
+    def screens_info() -> list[dict]:
+        base = admin_url()
+        out = []
+        for i, name in enumerate(screen_names(), start=1):
+            seen = display.get(i)
+            out.append({"id": i, "name": name, "width": seen["width"] if seen else None,
+                        "height": seen["height"] if seen else None,
+                        "live": bool(seen) and time.time() - seen["seen"] < 30,
+                        "url": f"{base}/?display&screen={i}" if base else ""})
+        return out
+
+    @app.get("/api/screens", dependencies=[Depends(admin)])
+    def get_screens():
+        return screens_info()
+
+    @app.put("/api/screens", dependencies=[Depends(admin)])
+    def put_screens(body: dict = Body(...)):
+        names = body.get("names")
+        if not isinstance(names, list) or not 1 <= len(names) <= MAX_SCREENS:
+            raise HTTPException(400, f"אפשר להגדיר בין מסך אחד ל-{MAX_SCREENS} מסכים")
+        names = [str(n or "").strip()[:30] or f"מסך {i}" for i, n in enumerate(names, start=1)]
+        store.set("screens", json.dumps(names, ensure_ascii=False))
+        for s in store.slides():      # a slide that pointed only at a removed screen goes back to all screens
+            if s["screens"]:
+                kept = [n for n in s["screens"] if n <= len(names)]
+                if kept != s["screens"]:
+                    store.set_slide_screens(s["id"], kept or None)
+        for n in [n for n in display if n > len(names)]:
+            del display[n]
+        store.bump()
+        return screens_info()
+
+    @app.post("/api/screens/identify", dependencies=[Depends(admin)])
+    def identify_screens():
+        """Every screen shows its number and name for a few seconds, so the owner can tell them apart."""
+        identify["until"] = time.time() + IDENTIFY_SECONDS
+        return {"ok": True, "seconds": IDENTIFY_SECONDS}
 
     # --- rendering --------------------------------------------------------
     def context() -> dict:
@@ -245,9 +304,10 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         items = [{**t, "defaults": lib.defaults(t["id"])} for t in lib.listing()]
         themes = [{"id": k, **v} for k, v in THEMES.items()]
         backgrounds = [{"id": BG_PREFIX + k, "name": v["name"], "css": v["css"]} for k, v in BACKGROUNDS.items()]
-        return {"categories": CATEGORIES, "templates": items, "themes": themes, "backgrounds": backgrounds}
+        return {"categories": CATEGORIES, "templates": items, "themes": themes, "backgrounds": backgrounds,
+                "screens": screens_info()}
 
-    def _slide_input(template_id: str, body: dict) -> tuple[dict, int, bool, dict | None, str | None]:
+    def _slide_input(template_id: str, body: dict) -> tuple[dict, int, bool, dict | None, str | None, list | None]:
         try:
             clean = lib.clean(template_id, body.get("data") or {})
             schedule = sched.clean(body.get("schedule"))
@@ -263,7 +323,17 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
                 expires = date.fromisoformat(str(expires)).isoformat()
             except ValueError:
                 raise HTTPException(400, "תאריך לא תקין") from None
-        return clean, duration, bool(body.get("enabled", True)), schedule, expires
+        screens = body.get("screens") or None
+        if screens is not None:
+            count = len(screen_names())
+            if not isinstance(screens, list) or any(
+                not isinstance(n, int) or isinstance(n, bool) or not 1 <= n <= count for n in screens
+            ):
+                raise HTTPException(400, "מסך לא קיים")
+            screens = sorted(set(screens))
+            if len(screens) == count:
+                screens = None        # all of them = "every screen", also for screens added later
+        return clean, duration, bool(body.get("enabled", True)), schedule, expires, screens
 
     def _expired(slide: dict) -> bool:
         return bool(slide["expires"]) and now().date().isoformat() > slide["expires"]
@@ -299,7 +369,7 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         s = store.slide(slide_id)
         if not s:
             raise HTTPException(404, "אין שקופית כזאת")
-        new_id = store.add_slide(s["template"], s["data"], s["duration"], s["enabled"], s["schedule"], s["expires"])
+        new_id = store.add_slide(s["template"], s["data"], s["duration"], s["enabled"], s["schedule"], s["expires"], s["screens"])
         return _with_name(store.slide(new_id))
 
     @app.delete("/api/slides/{slide_id}", dependencies=[Depends(admin)])
@@ -534,25 +604,32 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         return {"ok": True, "slides": len(store.slides())}
 
     @app.get("/api/playlist")
-    def playlist():
+    def playlist(screen: str = "1"):
         moment = now()
+        number = screen_number(screen)
+        names = screen_names()
         active = [
             {"id": s["id"], "duration": s["duration"],
              "wait_end": bool(lib.templates.get(s["template"], {}).get("wait_end")),
              "has_sound": s["template"] == "video" and s["data"].get("sound") == "on"}
             for s in store.slides()
             if s["enabled"] and not _expired(s) and sched.is_active(s["schedule"], moment) and s["template"] in lib.templates
+            and (not s["screens"] or number in s["screens"])
         ]
         m = music()
         tune = {"mode": "off"}
-        if m["mode"] == "radio":
+        if number != 1:
+            pass                      # music comes from the main screen only, or it would play twice
+        elif m["mode"] == "radio":
             tune = {"mode": "radio", "volume": m["volume"], "url": m["radio_url"]}
         elif m["mode"] == "playlist":
             tune = {"mode": "playlist", "volume": m["volume"], "shuffle": m["shuffle"],
                     "tracks": [t["name"] for t in store.tracks() if (uploads / t["name"]).is_file()]}
         url = admin_url()
         return {"version": store.version(), "slides": active, "admin_url": url, "network": bool(url),
-                "setup_done": setup_done(), "music": tune}
+                "setup_done": setup_done(), "music": tune,
+                "screen": {"id": number, "name": names[number - 1], "count": len(names)},
+                "identify": time.time() < identify["until"]}
 
     @app.post("/api/display")
     def report_display(body: dict = Body(...)):
@@ -562,7 +639,7 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         except (TypeError, ValueError):
             raise HTTPException(400, "bad size") from None
         if 100 <= w <= 20000 and 100 <= h <= 20000:
-            display.update(width=w, height=h, seen=time.time())
+            display[screen_number(body.get("screen"))] = {"width": w, "height": h, "seen": time.time()}
         return {"ok": True}
 
     @app.get("/api/qr.svg")
