@@ -236,3 +236,33 @@ def test_pages_and_qr(client):
     assert client.get("/").status_code == 200 and client.get("/admin").status_code == 200
     r = client.get("/api/qr.svg")
     assert r.status_code == 200 and r.headers["content-type"].startswith("image/svg")
+
+
+# ---------- backgrounds ----------
+def test_builtin_background_changes_the_look(admin):
+    plain = admin.post("/api/preview", json={"template": "text", "data": {}}).text
+    styled = admin.post("/api/preview", json={"template": "text", "data": {"background": "bg:dusk"}}).text
+    assert "body{background:#0f172a" in plain
+    assert "body{background:linear-gradient(160deg,#1e1b4b" in styled and "--accent:#fde68a" in styled
+
+
+def test_every_builtin_background_renders_unescaped(admin):
+    lib = admin.get("/api/templates").json()
+    assert len(lib["backgrounds"]) == 12
+    for bg in lib["backgrounds"]:
+        html = admin.post("/api/preview", json={"template": "menu", "data": {"background": bg["id"]}}).text
+        assert "body{background:" + bg["css"] in html, bg["id"]
+
+
+def test_photo_background_and_fallback_when_deleted(admin):
+    name = admin.post("/api/images", files={"file": ("p.png", png_bytes(), "image/png")}).json()["name"]
+    slide = admin.post("/api/slides", json={"template": "text", "data": {"background": name}}).json()
+    assert f"url(/uploads/{name}) center/cover" in admin.get(f"/render/{slide['id']}").text
+    admin.delete(f"/api/images/{name}")
+    html = admin.get(f"/render/{slide['id']}").text
+    assert "/uploads/" not in html and "body{background:#0f172a" in html
+
+
+@pytest.mark.parametrize("bad", ["bg:nope", "x.jpg", "url(http://evil)", "bg:dusk);}body{x", 5])
+def test_bad_background_rejected(admin, bad):
+    assert admin.post("/api/preview", json={"template": "text", "data": {"background": bad}}).status_code == 400

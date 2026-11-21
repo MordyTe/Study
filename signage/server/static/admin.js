@@ -189,6 +189,7 @@
     if (t.help) nodes.push(h('p', { class: 'muted', text: t.help }));
     t.fields.forEach(function (f) { nodes.push(fieldEditor(f, draft.data)); });
     nodes.push(h('label', { text: 'צבעים' }), themePicker(draft.data));
+    if (t.background !== false) nodes.push(h('label', { text: 'רקע' }), backgroundPicker(draft.data));
     screen(t.name, back, nodes, [
       h('button', { class: 'primary', text: 'המשך לתצוגה מקדימה', onclick: function () { previewStep(draft, function () { editFields(draft, back); }); } })]);
   }
@@ -201,6 +202,35 @@
       } }, h('span', { class: 'sw', style: 'background:' + th.bg + ';border-color:' + th.accent }), th.name);
       box.appendChild(b);
     });
+    return box;
+  }
+  /* Background: plain theme colour, one of the built-in designs, or the user's own photo. */
+  function backgroundPicker(data) {
+    var box = h('div', {});
+    var photoField = { key: 'background', type: 'image' };
+    function isPhoto() { return !!data.background && data.background.indexOf('bg:') !== 0; }
+    function draw(showPhotos) {
+      box.textContent = '';
+      var grid = h('div', { class: 'bgs', role: 'group', 'aria-label': 'רקע' });
+      function swatch(id, name, css, pressed, onclick) {
+        return h('button', { type: 'button', class: 'bg', 'aria-pressed': String(pressed), onclick: onclick },
+          h('span', { class: 'bgsw', style: css ? 'background:' + css : null, text: css ? '' : '—' }), h('span', { text: name }));
+      }
+      grid.appendChild(swatch('', 'לפי הצבעים', null, !data.background && !showPhotos, function () { data.background = ''; draw(false); }));
+      lib.backgrounds.forEach(function (b) {
+        // vh units are relative to the TV, so scale the pattern down for the small swatch
+        grid.appendChild(swatch(b.id, b.name, b.css.replace(/([\d.]+)vh/g, function (m, n) { return (n * 0.9).toFixed(2) + 'px'; }),
+          data.background === b.id, function () { data.background = b.id; draw(false); }));
+      });
+      grid.appendChild(swatch('photo', 'תמונה שלי', null, isPhoto() || showPhotos, function () { if (!isPhoto()) data.background = ''; draw(true); }));
+      box.appendChild(grid);
+      if (data.background && !isPhoto()) box.appendChild(h('p', { class: 'muted', text: 'רקע מעוצב מביא איתו צבעי טקסט משלו, במקום הצבעים שנבחרו למעלה.', style: 'margin-top:8px' }));
+      if (isPhoto() || showPhotos) {
+        box.appendChild(h('p', { class: 'muted', text: 'התמונה תוכהה מעט כדי שהטקסט יישאר קריא.', style: 'margin-top:8px' }));
+        box.appendChild(picker(photoField, data));
+      }
+    }
+    draw(false);
     return box;
   }
   function fieldEditor(f, data) {

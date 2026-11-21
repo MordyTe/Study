@@ -20,7 +20,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from . import schedule as sched
 from . import zmanim
 from .store import Store
-from .templates_lib import CATEGORIES, IMAGE_NAME, THEMES, Library, TemplateError
+from .templates_lib import BACKGROUNDS, BG_PREFIX, CATEGORIES, IMAGE_NAME, THEMES, Library, TemplateError
 
 STATIC = Path(__file__).resolve().parent / "static"
 COOKIE = "sg_session"
@@ -178,6 +178,9 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
                 data[key] = ""
             if field["type"] == "images":
                 data[key] = [i for i in data.get(key, []) if (uploads / i).is_file()]
+        background = data.get("background") or ""
+        if background and not background.startswith(BG_PREFIX) and not (uploads / background).is_file():
+            data["background"] = ""
         return lib.render(template_id, data, context())
 
     @app.get("/render/{slide_id}", response_class=HTMLResponse)
@@ -200,7 +203,8 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
     def templates():
         items = [{**t, "defaults": lib.defaults(t["id"])} for t in lib.listing()]
         themes = [{"id": k, **v} for k, v in THEMES.items()]
-        return {"categories": CATEGORIES, "templates": items, "themes": themes}
+        backgrounds = [{"id": BG_PREFIX + k, "name": v["name"], "css": v["css"]} for k, v in BACKGROUNDS.items()]
+        return {"categories": CATEGORIES, "templates": items, "themes": themes, "backgrounds": backgrounds}
 
     def _slide_input(template_id: str, body: dict) -> tuple[dict, int, bool, dict | None]:
         try:

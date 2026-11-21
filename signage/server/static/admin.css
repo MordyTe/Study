@@ -53,3 +53,7 @@ label{display:block;font-weight:600;margin:14px 0 6px}
 #toast.on{opacity:1}#toast.bad{background:var(--bad);color:#fff}
 .pin{font-size:1.6rem;letter-spacing:.4em;text-align:center;direction:ltr}
 .ltr{direction:ltr;text-align:right}
+.bgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+.bg{display:grid;gap:4px;padding:6px;font-size:.85rem;text-align:center}
+.bg[aria-pressed=true]{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand)}
+.bgsw{display:block;aspect-ratio:16/9;border-radius:6px;border:1px solid var(--line);line-height:2.6;color:var(--muted)}

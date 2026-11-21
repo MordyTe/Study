@@ -1,4 +1,4 @@
-{"name":"תמונה במסך מלא","description":"תמונה אחת, עם כיתוב אם רוצים","categories":["general","business"],"order":100,
+{"name":"תמונה במסך מלא","description":"תמונה אחת, עם כיתוב אם רוצים","categories":["general","business"],"background":false,"order":100,
  "fields":[
   {"key":"image","label":"תמונה","type":"image","default":""},
   {"key":"caption","label":"כיתוב (לא חובה)","type":"text","default":"","max":100},
