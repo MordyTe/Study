@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS slides (
   schedule TEXT,
   position INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS tracks (name TEXT PRIMARY KEY, title TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, created REAL NOT NULL);
 """
@@ -27,6 +28,9 @@ class Store:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._db() as db:
             db.executescript(SCHEMA)
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(slides)")}
+            if "expires" not in columns:  # databases created before slides could expire
+                db.execute("ALTER TABLE slides ADD COLUMN expires TEXT")
 
     @contextmanager
     def _db(self):
@@ -84,6 +88,7 @@ class Store:
             "duration": row["duration"],
             "enabled": bool(row["enabled"]),
             "schedule": json.loads(row["schedule"]) if row["schedule"] else None,
+            "expires": row["expires"],
         }
 
     def slides(self) -> list[dict]:
@@ -96,24 +101,26 @@ class Store:
             row = db.execute("SELECT * FROM slides WHERE id=?", (slide_id,)).fetchone()
         return self._slide(row) if row else None
 
-    def add_slide(self, template: str, data: dict, duration: int, enabled: bool, schedule: dict | None) -> int:
+    def add_slide(self, template: str, data: dict, duration: int, enabled: bool, schedule: dict | None,
+                  expires: str | None = None) -> int:
         with self._db() as db:
             pos = db.execute("SELECT COALESCE(MAX(position),0)+1 FROM slides").fetchone()[0]
             cur = db.execute(
-                "INSERT INTO slides(template,data,duration,enabled,schedule,position) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO slides(template,data,duration,enabled,schedule,position,expires) VALUES(?,?,?,?,?,?,?)",
                 (template, json.dumps(data, ensure_ascii=False), duration, int(enabled),
-                 json.dumps(schedule) if schedule else None, pos),
+                 json.dumps(schedule) if schedule else None, pos, expires),
             )
             new_id = cur.lastrowid
         self.bump()
         return new_id
 
-    def update_slide(self, slide_id: int, data: dict, duration: int, enabled: bool, schedule: dict | None) -> None:
+    def update_slide(self, slide_id: int, data: dict, duration: int, enabled: bool, schedule: dict | None,
+                     expires: str | None = None) -> None:
         with self._db() as db:
             db.execute(
-                "UPDATE slides SET data=?, duration=?, enabled=?, schedule=? WHERE id=?",
+                "UPDATE slides SET data=?, duration=?, enabled=?, schedule=?, expires=? WHERE id=?",
                 (json.dumps(data, ensure_ascii=False), duration, int(enabled),
-                 json.dumps(schedule) if schedule else None, slide_id),
+                 json.dumps(schedule) if schedule else None, expires, slide_id),
             )
         self.bump()
 
@@ -127,3 +134,21 @@ class Store:
             for pos, slide_id in enumerate(ids, start=1):
                 db.execute("UPDATE slides SET position=? WHERE id=?", (pos, slide_id))
         self.bump()
+
+    # --- music tracks ---------------------------------------------------
+    def tracks(self) -> list[dict]:
+        with self._db() as db:
+            rows = db.execute("SELECT name, title FROM tracks ORDER BY position, name").fetchall()
+        return [{"name": r["name"], "title": r["title"]} for r in rows]
+
+    def add_track(self, name: str, title: str) -> None:
+        with self._db() as db:
+            pos = db.execute("SELECT COALESCE(MAX(position),0)+1 FROM tracks").fetchone()[0]
+            db.execute("INSERT INTO tracks(name,title,position) VALUES(?,?,?)", (name, title, pos))
+        self.bump()
+
+    def delete_track(self, name: str) -> bool:
+        with self._db() as db:
+            found = db.execute("DELETE FROM tracks WHERE name=?", (name,)).rowcount > 0
+        self.bump()
+        return found

@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import re
 import hmac
 import io
 import os
 import secrets
 import socket
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import segno
@@ -28,23 +30,52 @@ COOKIE = "sg_session"
 SESSION_SECONDS = 30 * 24 * 3600
 MAX_UPLOAD = 25 * 1024 * 1024
 MAX_VIDEO = 300 * 1024 * 1024
+MAX_AUDIO = 50 * 1024 * 1024
+AUDIO_NAME = re.compile(r"^[0-9a-f]{16}\.(mp3|ogg|m4a|wav)$")
+MUSIC_OFF = {"mode": "off", "volume": 40, "shuffle": True, "radio_name": "", "radio_url": ""}
 MAX_SIDE = 2560
 MAX_FAILS, LOCK_SECONDS = 5, 60
 
 
-def lan_ip() -> str:
+def lan_ip() -> str | None:
+    """This device's address on the local network, or None while it has no network yet."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(("10.255.255.255", 1))  # no packet is sent; just picks the outgoing interface
-        return s.getsockname()[0]
+        ip = s.getsockname()[0]
+        return None if ip.startswith("127.") or ip == "0.0.0.0" else ip
     except OSError:
-        return "127.0.0.1"
+        return None
     finally:
         s.close()
 
 
+LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+# What a new screen starts with, per kind of place: (template, overrides for its default fields)
+STARTER = {
+    "business": [("welcome", {}), ("hours", {}), ("menu", {}), ("promo", {})],
+    "lobby": [("welcome", {}), ("notices", {}), ("shabbat", {}), ("clock", {})],
+    "synagogue": [("welcome", {}), ("prayers", {}), ("zmanim", {}), ("shabbat", {}), ("notices", {"title": "הודעות הקהילה", "notices": []})],
+    "general": [("welcome", {}), ("clock", {})],
+}
+
+
 def _hash_pin(pin: str, salt: str) -> str:
     return hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(salt), 200_000).hex()
+
+
+def audio_ext(head: bytes) -> str | None:
+    """Recognise an audio file by its first bytes, not by its name."""
+    if head[:3] == b"ID3" or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0):
+        return ".mp3"
+    if head[:4] == b"OggS":
+        return ".ogg"
+    if head[4:8] == b"ftyp":
+        return ".m4a"
+    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return ".wav"
+    return None
 
 
 def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zmanim.TZ), canva_transport=None) -> FastAPI:
@@ -62,6 +93,7 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
 
     app = FastAPI(title="Signage", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store, app.state.lib, app.state.uploads = store, lib, uploads
+    app.state.lan_ip = lan_ip   # replaceable, so tests can pull the network cable
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     app.mount("/uploads", StaticFiles(directory=uploads), name="uploads")
 
@@ -108,7 +140,8 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
 
     @app.get("/api/auth/state")
     def auth_state(request: Request):
-        return {"pin_set": pin_is_set(), "logged_in": logged_in(request)}
+        return {"pin_set": pin_is_set(), "logged_in": logged_in(request), "setup_done": setup_done(),
+                "cities": list(zmanim.CITIES) if logged_in(request) else []}
 
     @app.post("/api/auth/setup")
     def auth_setup(response: Response, body: dict = Body(...)):
@@ -150,7 +183,8 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
     @app.get("/api/settings", dependencies=[Depends(admin)])
     def get_settings():
         shown = {**display, "live": time.time() - display["seen"] < 30} if display else None
-        return {**settings(), "cities": list(zmanim.CITIES), "admin_url": admin_url(), "display": shown}
+        return {**settings(), "cities": list(zmanim.CITIES), "admin_url": admin_url() + "/admin" if admin_url() else "",
+                "display": shown}
 
     @app.put("/api/settings", dependencies=[Depends(admin)])
     def put_settings(body: dict = Body(...)):
@@ -213,7 +247,7 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         backgrounds = [{"id": BG_PREFIX + k, "name": v["name"], "css": v["css"]} for k, v in BACKGROUNDS.items()]
         return {"categories": CATEGORIES, "templates": items, "themes": themes, "backgrounds": backgrounds}
 
-    def _slide_input(template_id: str, body: dict) -> tuple[dict, int, bool, dict | None]:
+    def _slide_input(template_id: str, body: dict) -> tuple[dict, int, bool, dict | None, str | None]:
         try:
             clean = lib.clean(template_id, body.get("data") or {})
             schedule = sched.clean(body.get("schedule"))
@@ -223,12 +257,22 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
             duration = max(5, min(600, int(body.get("duration", 12))))
         except (TypeError, ValueError):
             raise HTTPException(400, "משך הצגה לא תקין") from None
-        return clean, duration, bool(body.get("enabled", True)), schedule
+        expires = body.get("expires") or None
+        if expires is not None:
+            try:
+                expires = date.fromisoformat(str(expires)).isoformat()
+            except ValueError:
+                raise HTTPException(400, "תאריך לא תקין") from None
+        return clean, duration, bool(body.get("enabled", True)), schedule, expires
+
+    def _expired(slide: dict) -> bool:
+        return bool(slide["expires"]) and now().date().isoformat() > slide["expires"]
 
     def _with_name(slide: dict) -> dict:
         meta = lib.templates.get(slide["template"], {})
         return {**slide, "template_name": meta.get("name", slide["template"]),
-                "active_now": slide["enabled"] and sched.is_active(slide["schedule"], now())}
+                "expired": _expired(slide),
+                "active_now": slide["enabled"] and not _expired(slide) and sched.is_active(slide["schedule"], now())}
 
     @app.get("/api/slides", dependencies=[Depends(admin)])
     def list_slides():
@@ -249,6 +293,14 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
             raise HTTPException(404, "אין שקופית כזאת")
         store.update_slide(slide_id, *_slide_input(slide["template"], body))
         return _with_name(store.slide(slide_id))
+
+    @app.post("/api/slides/{slide_id}/copy", dependencies=[Depends(admin)])
+    def copy_slide(slide_id: int):
+        s = store.slide(slide_id)
+        if not s:
+            raise HTTPException(404, "אין שקופית כזאת")
+        new_id = store.add_slide(s["template"], s["data"], s["duration"], s["enabled"], s["schedule"], s["expires"])
+        return _with_name(store.slide(new_id))
 
     @app.delete("/api/slides/{slide_id}", dependencies=[Depends(admin)])
     def delete_slide(slide_id: int):
@@ -319,20 +371,23 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
             ext = ".webm"
         else:
             raise HTTPException(400, "אפשר להעלות רק סרטוני MP4 או WebM")
+        return {"name": await stream_upload(file, head, ext, MAX_VIDEO, "הסרטון גדול מדי (עד 300MB)")}
+
+    async def stream_upload(file: UploadFile, head: bytes, ext: str, limit: int, too_big: str) -> str:
         name = secrets.token_hex(8) + ext
         partial, size = uploads / (name + ".part"), len(head)
         try:
-            with partial.open("wb") as out:   # streamed to disk: videos do not fit in memory on a Pi
+            with partial.open("wb") as out:   # streamed to disk: large files do not fit in memory on a Pi
                 out.write(head)
                 while chunk := await file.read(1024 * 1024):
                     size += len(chunk)
-                    if size > MAX_VIDEO:
-                        raise HTTPException(413, "הסרטון גדול מדי (עד 300MB)")
+                    if size > limit:
+                        raise HTTPException(413, too_big)
                     out.write(chunk)
             partial.rename(uploads / name)
         finally:
             partial.unlink(missing_ok=True)
-        return {"name": name}
+        return name
 
     @app.delete("/api/videos/{name}", dependencies=[Depends(admin)])
     def delete_video(name: str):
@@ -340,6 +395,59 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
             raise HTTPException(404, "אין סרטון כזה")
         (uploads / name).unlink()
         store.bump()
+        return {"ok": True}
+
+    # --- background music ---------------------------------------------------
+    def music() -> dict:
+        try:
+            return {**MUSIC_OFF, **json.loads(store.get("music") or "{}")}
+        except ValueError:
+            return dict(MUSIC_OFF)
+
+    @app.get("/api/music", dependencies=[Depends(admin)])
+    def get_music():
+        return {**music(), "tracks": store.tracks()}
+
+    @app.put("/api/music", dependencies=[Depends(admin)])
+    def put_music(body: dict = Body(...)):
+        mode = body.get("mode")
+        if mode not in ("off", "playlist", "radio"):
+            raise HTTPException(400, "מצב לא תקין")
+        try:
+            volume = max(0, min(100, int(body.get("volume", 40))))
+        except (TypeError, ValueError):
+            raise HTTPException(400, "עוצמה לא תקינה") from None
+        url = str(body.get("radio_url") or "").strip()
+        name = str(body.get("radio_name") or "").strip()[:60]
+        if url and (len(url) > 500 or not re.match(r"^https?://[^\s<>\"']+$", url)):
+            raise HTTPException(400, "כתובת הרדיו צריכה להתחיל ב-http:// או https://")
+        if mode == "radio" and not url:
+            raise HTTPException(400, "צריך להזין כתובת של תחנת רדיו")
+        if mode == "playlist" and not store.tracks():
+            raise HTTPException(400, "קודם העלו לפחות שיר אחד")
+        store.set("music", json.dumps({"mode": mode, "volume": volume, "shuffle": bool(body.get("shuffle", True)),
+                                       "radio_name": name, "radio_url": url}, ensure_ascii=False))
+        store.bump()
+        return get_music()
+
+    @app.post("/api/music/tracks", dependencies=[Depends(admin)])
+    async def upload_track(file: UploadFile = File(...)):
+        head = await file.read(16)
+        ext = audio_ext(head)
+        if not ext:
+            raise HTTPException(400, "אפשר להעלות קובצי MP3, M4A, OGG או WAV")
+        name = await stream_upload(file, head, ext, MAX_AUDIO, "הקובץ גדול מדי (עד 50MB)")
+        title = re.sub(r"\.[A-Za-z0-9]{2,4}$", "", Path(file.filename or "").name).strip()[:80] or "שיר"
+        store.add_track(name, title)
+        return {"name": name, "title": title}
+
+    @app.delete("/api/music/tracks/{name}", dependencies=[Depends(admin)])
+    def delete_track(name: str):
+        if not AUDIO_NAME.match(name) or not store.delete_track(name):
+            raise HTTPException(404, "אין שיר כזה")
+        (uploads / name).unlink(missing_ok=True)
+        if not store.tracks() and music()["mode"] == "playlist":   # nothing left to play
+            store.set("music", json.dumps({**music(), "mode": "off"}, ensure_ascii=False))
         return {"ok": True}
 
     # --- Canva ------------------------------------------------------------
@@ -395,17 +503,56 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
 
     # --- display ------------------------------------------------------------
     def admin_url() -> str:
-        return f"http://{lan_ip()}:{port}/admin"
+        """Address to type on a phone; empty while the device has no network. '/' sends visitors on to /admin."""
+        ip = app.state.lan_ip()
+        return f"http://{ip}" + ("" if port == 80 else f":{port}") if ip else ""
+
+    def setup_done() -> bool:
+        return bool(store.get("setup_done")) or bool(store.slides())   # screens set up before the wizard existed
+
+    @app.post("/api/setup", dependencies=[Depends(admin)])
+    def first_setup(body: dict = Body(...)):
+        """First-run wizard: name, city, kind of place -> a ready set of slides to edit."""
+        place = str(body.get("place") or "").strip()
+        category = body.get("category")
+        if len(place) > 60:
+            raise HTTPException(400, "שם המקום ארוך מדי")
+        if body.get("city") not in zmanim.CITIES:
+            raise HTTPException(400, "עיר לא מוכרת")
+        if category not in STARTER:
+            raise HTTPException(400, "סוג מקום לא מוכר")
+        store.set("place", place)
+        store.set("city", body["city"])
+        if not store.slides():
+            for template_id, overrides in STARTER[category]:
+                data = {**lib.defaults(template_id), **overrides}
+                if template_id == "welcome" and place:
+                    data["subtitle"] = place
+                store.add_slide(template_id, lib.clean(template_id, data), 12, True, None)
+        store.set("setup_done", "1")
+        store.bump()
+        return {"ok": True, "slides": len(store.slides())}
 
     @app.get("/api/playlist")
     def playlist():
         moment = now()
         active = [
-            {"id": s["id"], "duration": s["duration"], "wait_end": bool(lib.templates.get(s["template"], {}).get("wait_end"))}
+            {"id": s["id"], "duration": s["duration"],
+             "wait_end": bool(lib.templates.get(s["template"], {}).get("wait_end")),
+             "has_sound": s["template"] == "video" and s["data"].get("sound") == "on"}
             for s in store.slides()
-            if s["enabled"] and sched.is_active(s["schedule"], moment) and s["template"] in lib.templates
+            if s["enabled"] and not _expired(s) and sched.is_active(s["schedule"], moment) and s["template"] in lib.templates
         ]
-        return {"version": store.version(), "slides": active, "admin_url": admin_url()}
+        m = music()
+        tune = {"mode": "off"}
+        if m["mode"] == "radio":
+            tune = {"mode": "radio", "volume": m["volume"], "url": m["radio_url"]}
+        elif m["mode"] == "playlist":
+            tune = {"mode": "playlist", "volume": m["volume"], "shuffle": m["shuffle"],
+                    "tracks": [t["name"] for t in store.tracks() if (uploads / t["name"]).is_file()]}
+        url = admin_url()
+        return {"version": store.version(), "slides": active, "admin_url": url, "network": bool(url),
+                "setup_done": setup_done(), "music": tune}
 
     @app.post("/api/display")
     def report_display(body: dict = Body(...)):
@@ -420,12 +567,19 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
 
     @app.get("/api/qr.svg")
     def qr():
+        if not admin_url():
+            raise HTTPException(404, "no network yet")
         buf = io.BytesIO()
-        segno.make(admin_url(), error="m").save(buf, kind="svg", scale=10, border=2, dark="#0f172a", light="#ffffff")
+        segno.make(admin_url() + "/admin", error="m").save(buf, kind="svg", scale=10, border=2, dark="#0f172a", light="#ffffff")
         return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
 
     @app.get("/", include_in_schema=False)
-    def player_page():
+    def player_page(request: Request):
+        # The address shown on the TV is just the IP. Someone typing it on a phone wants the
+        # admin page; only the device's own browser (or ?display) gets the display.
+        local = request.client is not None and request.client.host in LOOPBACK
+        if not local and "display" not in request.query_params:
+            return RedirectResponse("/admin", status_code=302)
         return FileResponse(STATIC / "player.html", headers={"Cache-Control": "no-store"})
 
     @app.get("/admin", include_in_schema=False)

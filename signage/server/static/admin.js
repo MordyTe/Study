@@ -83,16 +83,16 @@
   function showAuth() {
     bar.hidden = true;
     api('GET', '/api/auth/state').then(function (s) {
-      if (s.logged_in) return boot();
+      if (s.logged_in) return s.setup_done ? boot() : onboarding(s.cities);
       var setup = !s.pin_set;
       var pin = h('input', { class: 'pin', type: 'password', inputmode: 'numeric', autocomplete: setup ? 'new-password' : 'current-password', maxlength: '8', id: 'pin', 'aria-describedby': 'pinhelp' });
       var form = h('form', {
         class: 'card', onsubmit: function (e) {
           e.preventDefault();
-          api('POST', setup ? '/api/auth/setup' : '/api/auth/login', { pin: pin.value }).then(boot).catch(function (err) { pin.value = ''; fail(err); });
+          api('POST', setup ? '/api/auth/setup' : '/api/auth/login', { pin: pin.value }).then(showAuth).catch(function (err) { pin.value = ''; fail(err); });
         }
       },
-        h('h2', { text: setup ? 'בחרו קוד כניסה' : 'כניסה לניהול המסך' }),
+        h('h2', { text: setup ? 'שלב 1 מתוך 2: בחרו קוד כניסה' : 'כניסה לניהול המסך' }),
         h('p', { class: 'muted', id: 'pinhelp', text: setup ? 'קוד של 4 עד 8 ספרות. רק מי שיודע אותו יוכל לשנות את מה שמוצג.' : 'הקלידו את קוד הכניסה.' }),
         h('label', { for: 'pin', text: 'קוד' }), pin,
         h('p', {}), h('button', { class: 'primary', type: 'submit', text: setup ? 'שמירה והמשך' : 'כניסה' }));
@@ -100,6 +100,38 @@
       view.appendChild(form);
       pin.focus();
     }).catch(fail);
+  }
+
+  /* First run, after choosing a PIN: three questions, then a ready-made set of slides. */
+  function onboarding(cities) {
+    var kinds = [['business', 'עסק', 'מסעדה, חנות, מספרה, קליניקה'], ['lobby', 'לובי בניין', 'הודעות ועד, זמני שבת, שעון'],
+      ['synagogue', 'בית כנסת', 'זמני תפילות, זמני היום, הודעות'], ['general', 'משהו אחר', 'מתחילים ממסך כמעט ריק']];
+    var chosen = 'business';
+    var place = h('input', { id: 'oplace', type: 'text', maxlength: '60', autocomplete: 'organization' });
+    var city = h('select', { id: 'ocity' }, cities.map(function (c) { return h('option', { value: c, text: c }); }));
+    city.value = 'תל אביב';
+    var group = h('div', { role: 'radiogroup', 'aria-label': 'סוג המקום' });
+    kinds.forEach(function (k) {
+      var b = h('button', { type: 'button', class: 'choice', role: 'radio', 'aria-checked': String(k[0] === chosen), onclick: function () {
+        chosen = k[0];
+        Array.prototype.forEach.call(group.children, function (c) { c.setAttribute('aria-checked', String(c === b)); });
+      } }, h('b', { text: k[1] }), h('span', { text: k[2] }));
+      group.appendChild(b);
+    });
+    view.textContent = '';
+    view.appendChild(h('form', { onsubmit: function (e) {
+      e.preventDefault();
+      api('POST', '/api/setup', { place: place.value, city: city.value, category: chosen })
+        .then(function () { toast('המסך מוכן. עכשיו אפשר לערוך את השקופיות'); boot(); }).catch(fail);
+    } },
+      h('div', { class: 'card' },
+        h('h2', { text: 'שלב 2 מתוך 2: כמה פרטים על המקום', style: 'margin-top:0' }),
+        h('p', { class: 'muted', text: 'לפי התשובות נכין כמה שקופיות מוכנות. את הכול אפשר לשנות אחר כך.' }),
+        h('label', { for: 'oplace', text: 'שם המקום' }), place,
+        h('label', { for: 'ocity', text: 'עיר' }), city,
+        h('label', { text: 'סוג המקום' }), group),
+      h('button', { class: 'primary', type: 'submit', text: 'סיום והפעלת המסך', style: 'width:100%' })));
+    place.focus();
   }
 
   function boot() {
@@ -131,7 +163,8 @@
         nodes.push(h('p', { class: 'muted', text: 'השקופיות מוצגות אחת אחרי השנייה, לפי הסדר כאן.' }));
       }
       slides.forEach(function (s, i) {
-        var badge = !s.enabled ? h('span', { class: 'badge off', text: 'כבויה' })
+        var badge = s.expired ? h('span', { class: 'badge off', text: 'פג תוקף' })
+          : !s.enabled ? h('span', { class: 'badge off', text: 'כבויה' })
           : s.active_now ? h('span', { class: 'badge on', text: 'מוצגת עכשיו' })
             : h('span', { class: 'badge off', text: 'מחוץ לשעות' });
         function move(delta) {
@@ -147,7 +180,10 @@
             h('div', { class: 'btns' },
               h('button', { class: 'small', text: 'עריכה', onclick: function () { editSlide(s); } }),
               h('button', { class: 'small', text: s.enabled ? 'כיבוי' : 'הפעלה', onclick: function () {
-                api('PUT', '/api/slides/' + s.id, { data: s.data, duration: s.duration, schedule: s.schedule, enabled: !s.enabled }).then(showHome).catch(fail);
+                api('PUT', '/api/slides/' + s.id, { data: s.data, duration: s.duration, schedule: s.schedule, expires: s.expires, enabled: !s.enabled }).then(showHome).catch(fail);
+              } }),
+              h('button', { class: 'small', text: 'שכפול', onclick: function () {
+                api('POST', '/api/slides/' + s.id + '/copy').then(function () { toast('שוכפלה'); showHome(); }).catch(fail);
               } }),
               h('button', { class: 'small', 'aria-label': 'העבר למעלה', text: '▲', disabled: i === 0, onclick: function () { move(-1); } }),
               h('button', { class: 'small', 'aria-label': 'העבר למטה', text: '▼', disabled: i === slides.length - 1, onclick: function () { move(1); } }),
@@ -159,6 +195,7 @@
       });
       screen('המסך שלי', null, nodes, [
         h('button', { text: 'תמונות', onclick: showImages }),
+        h('button', { text: 'מוזיקה', onclick: function () { showMusic(); } }),
         h('button', { class: 'primary', text: '+ שקופית חדשה', onclick: wizardCategory })]);
     }).catch(fail);
   }
@@ -185,7 +222,7 @@
     })]);
   }
   function editSlide(s) {
-    editFields({ id: s.id, template: s.template, data: clone(s.data), duration: s.duration, enabled: s.enabled, schedule: s.schedule }, showHome);
+    editFields({ id: s.id, template: s.template, data: clone(s.data), duration: s.duration, enabled: s.enabled, schedule: s.schedule, expires: s.expires }, showHome);
   }
 
   // ---------- step 3: content ----------
@@ -379,13 +416,16 @@
       append(schedBox, [h('label', { text: 'באילו ימים' }), days,
         h('div', { class: 'two' }, h('div', {}, h('label', { for: 'start', text: 'משעה' }), start), h('div', {}, h('label', { for: 'end', text: 'עד שעה' }), end))]);
       always.addEventListener('change', function () { schedBox.hidden = always.checked; });
+      var expires = h('input', { type: 'date', id: 'exp', value: draft.expires || '' });
       var duration = h('input', { type: 'number', id: 'dur', inputmode: 'numeric', min: '5', max: '600', value: draft.duration });
 
       var waitEnd = !!templateOf(draft.template).wait_end;
       screen('כך זה ייראה', back, [steps(4), frame(null, html),
         waitEnd ? h('p', { class: 'muted', text: 'הסרטון מתנגן עד סופו, ואז עוברים לשקופית הבאה.', style: 'margin-top:12px' }) : [h('label', { for: 'dur', text: 'כמה שניות להציג לפני המעבר לשקופית הבאה' }), duration],
         h('div', { class: 'check' }, always, h('label', { for: 'always', text: 'להציג תמיד', style: 'margin:0' })),
-        schedBox
+        schedBox,
+        h('label', { for: 'exp', text: 'להציג עד תאריך (לא חובה)' }), expires,
+        h('p', { class: 'muted', text: 'אחרי התאריך הזה השקופית יורדת מהמסך לבד. מתאים למבצעים ולהודעות זמניות.', style: 'margin-top:6px' })
       ], [
         h('button', { text: 'חזרה לעריכה', onclick: back }),
         h('button', { class: 'primary', text: draft.id ? 'שמירה' : 'פרסום למסך', onclick: function () {
@@ -393,7 +433,8 @@
           var body = {
             template: draft.template, data: draft.data, enabled: draft.enabled,
             duration: parseInt(duration.value, 10) || 12,
-            schedule: always.checked ? null : { days: sched.days, start: start.value, end: end.value }
+            schedule: always.checked ? null : { days: sched.days, start: start.value, end: end.value },
+            expires: expires.value || null
           };
           var req = draft.id ? api('PUT', '/api/slides/' + draft.id, body) : api('POST', '/api/slides', body);
           req.then(function () { toast(draft.id ? 'נשמר. המסך יתעדכן תוך כמה שניות' : 'פורסם. יופיע על המסך תוך כמה שניות'); showHome(); }).catch(fail);
@@ -416,6 +457,66 @@
       })));
       if (images.length) nodes.push(h('p', { class: 'muted', text: 'לחיצה על תמונה מוחקת אותה (אחרי אישור).', style: 'margin-top:12px' }));
       screen('תמונות', showHome, nodes, [h('button', { text: 'ייבוא מ-Canva', onclick: showCanva }), uploadButton('העלאת תמונות', showImages)]);
+    }).catch(fail);
+  }
+
+  // ---------- background music ----------
+  function showMusic(keepMode) {
+    api('GET', '/api/music').then(function (m) {
+      if (typeof keepMode === 'string') m.mode = keepMode;   // stay on the choice being edited after an upload or delete
+      function radio(value, label, hint) {
+        var id = 'mode_' + value;
+        var input = h('input', { type: 'radio', name: 'mode', id: id, value: value, checked: m.mode === value });
+        input.addEventListener('change', function () { m.mode = value; sync(); });
+        return h('div', { class: 'check', style: 'align-items:flex-start' }, input,
+          h('label', { for: id, style: 'margin:0' }, label, h('span', { class: 'muted', style: 'display:block;font-weight:400', text: hint })));
+      }
+      var volume = h('input', { type: 'range', id: 'vol', min: '0', max: '100', step: '5', value: m.volume });
+      var volText = h('span', { text: m.volume + '%' });
+      volume.addEventListener('input', function () { volText.textContent = volume.value + '%'; });
+      var shuffle = h('input', { type: 'checkbox', id: 'shuf', checked: m.shuffle });
+      var rname = h('input', { id: 'rname', type: 'text', maxlength: '60', value: m.radio_name });
+      var rurl = h('input', { id: 'rurl', class: 'ltr', type: 'url', inputmode: 'url', maxlength: '500', placeholder: 'https://', value: m.radio_url });
+
+      var input = h('input', { type: 'file', accept: 'audio/*,.mp3,.m4a,.ogg,.wav', multiple: 'multiple', hidden: true });
+      var up = h('button', { type: 'button', text: '+ העלאת שירים', onclick: function () { input.click(); } });
+      input.addEventListener('change', function () {
+        var files = Array.prototype.slice.call(input.files);
+        if (!files.length) return;
+        up.disabled = true; up.textContent = 'מעלה…';
+        files.reduce(function (p, file) {
+          return p.then(function () { var fd = new FormData(); fd.append('file', file); return api('POST', '/api/music/tracks', fd); });
+        }, Promise.resolve()).then(function () { toast('עלה'); }).catch(fail).then(function () { showMusic(m.mode); });
+      });
+      var songs = h('div', { class: 'card' }, h('h2', { text: 'השירים שלי', style: 'margin-top:0' }),
+        m.tracks.length ? m.tracks.map(function (t) {
+          return h('div', { class: 'track' }, h('span', { text: t.title }),
+            h('button', { class: 'small danger', text: 'מחיקה', 'aria-label': 'מחיקת ' + t.title, onclick: function () {
+              if (confirm('למחוק את "' + t.title + '"?')) api('DELETE', '/api/music/tracks/' + t.name).then(function () { showMusic(m.mode); }).catch(fail);
+            } }));
+        }) : h('p', { class: 'muted', text: 'עוד אין שירים. אפשר להעלות קובצי MP3, M4A, OGG או WAV.' }),
+        h('div', { class: 'check' }, shuffle, h('label', { for: 'shuf', text: 'לנגן בסדר אקראי', style: 'margin:0' })),
+        up, input);
+      var station = h('div', { class: 'card' }, h('h2', { text: 'תחנת רדיו', style: 'margin-top:0' }),
+        h('label', { for: 'rname', text: 'שם התחנה (לא חובה)' }), rname,
+        h('label', { for: 'rurl', text: 'כתובת השידור' }), rurl,
+        h('p', { class: 'muted', style: 'margin-top:6px', text: 'כתובת של שידור ישיר (stream) שמסתיימת בדרך כלל ב-mp3 או aac, ולא כתובת של אתר התחנה. דורש אינטרנט.' }));
+      function sync() { songs.hidden = m.mode !== 'playlist'; station.hidden = m.mode !== 'radio'; }
+      sync();
+      screen('מוזיקת רקע', showHome, [
+        h('div', { class: 'card', role: 'radiogroup', 'aria-label': 'מה לנגן' },
+          radio('off', 'בלי מוזיקה', 'המסך שקט'),
+          radio('playlist', 'השירים שלי', 'קבצים שהעליתם, מתנגנים בלולאה. עובד גם בלי אינטרנט'),
+          radio('radio', 'רדיו באינטרנט', 'שידור ישיר של תחנה לפי כתובת')),
+        songs, station,
+        h('div', { class: 'card' },
+          h('label', { for: 'vol', style: 'margin-top:0' }, 'עוצמה: ', volText), volume,
+          h('p', { class: 'muted', style: 'margin-top:8px', text: 'כשמוצג סרטון עם קול, המוזיקה נעצרת וחוזרת אחריו.' })),
+        h('p', { class: 'muted', text: 'שימו לב: השמעת מוזיקה במקום ציבורי או בעסק דורשת בדרך כלל רישיון מארגוני הזכויות (כמו אקו"ם), גם כשמדובר ברדיו.' })
+      ], [h('button', { class: 'primary', text: 'שמירה', onclick: function () {
+        api('PUT', '/api/music', { mode: m.mode, volume: parseInt(volume.value, 10), shuffle: shuffle.checked, radio_name: rname.value, radio_url: rurl.value })
+          .then(function () { toast('נשמר. המסך יתעדכן תוך כמה שניות'); showHome(); }).catch(fail);
+      } })]);
     }).catch(fail);
   }
 

@@ -233,7 +233,7 @@ def test_settings_and_context(admin):
 
 
 def test_pages_and_qr(client):
-    assert client.get("/").status_code == 200 and client.get("/admin").status_code == 200
+    assert client.get("/?display=1").status_code == 200 and client.get("/admin").status_code == 200
     r = client.get("/api/qr.svg")
     assert r.status_code == 200 and r.headers["content-type"].startswith("image/svg")
 
@@ -420,7 +420,7 @@ def test_video_upload_slide_and_delete(admin):
     slide = admin.post("/api/slides", json={"template": "video", "data": {"video": mp4, "sound": "on"}}).json()
     html = admin.get(f"/render/{slide['id']}").text
     assert f'src="/uploads/{mp4}"' in html and " muted" not in html.split("<video")[1].split(">")[0]
-    assert admin.get("/api/playlist").json()["slides"] == [{"id": slide["id"], "duration": 12, "wait_end": True}]
+    assert admin.get("/api/playlist").json()["slides"] == [{"id": slide["id"], "duration": 12, "wait_end": True, "has_sound": True}]
     assert admin.post("/api/slides", json={"template": "video", "data": {"video": "../x.mp4"}}).status_code == 400
     assert admin.post("/api/slides", json={"template": "image", "data": {"image": mp4}}).status_code == 400
 
@@ -448,3 +448,124 @@ def test_display_report(admin):
     admin.post("/api/display", json={"width": 5, "height": 5})        # nonsense is ignored
     assert admin.get("/api/settings").json()["display"]["width"] == 3840
     assert admin.post("/api/display", json={"width": "x"}).status_code == 400
+
+
+# ---------- music, expiry, copy ----------
+MP3 = b"ID3\x03\x00\x00\x00\x00\x00\x0a" + b"\x00" * 64
+OGG = b"OggS" + b"\x00" * 64
+
+
+def test_music_playlist(admin):
+    assert admin.get("/api/playlist").json()["music"] == {"mode": "off"}
+    assert admin.put("/api/music", json={"mode": "playlist"}).status_code == 400          # nothing to play yet
+    assert admin.post("/api/music/tracks", files={"file": ("x.mp3", png_bytes(), "audio/mpeg")}).status_code == 400
+    a = admin.post("/api/music/tracks", files={"file": ("שיר ראשון.mp3", MP3, "audio/mpeg")}).json()
+    b = admin.post("/api/music/tracks", files={"file": ("../../second.ogg", OGG, "audio/ogg")}).json()
+    assert a["title"] == "שיר ראשון" and a["name"].endswith(".mp3") and b["title"] == "second" and b["name"].endswith(".ogg")
+    assert admin.get("/api/images").json() == [] and admin.get("/api/videos").json() == []
+
+    m = admin.put("/api/music", json={"mode": "playlist", "volume": 250, "shuffle": False}).json()
+    assert m["volume"] == 100 and [t["title"] for t in m["tracks"]] == ["שיר ראשון", "second"]
+    assert admin.get("/api/playlist").json()["music"] == {"mode": "playlist", "volume": 100, "shuffle": False, "tracks": [a["name"], b["name"]]}
+    assert admin.get(f"/uploads/{a['name']}").status_code == 200
+
+    assert admin.delete(f"/api/music/tracks/{a['name']}").status_code == 200
+    assert admin.get("/api/playlist").json()["music"]["tracks"] == [b["name"]]
+    assert admin.delete(f"/api/music/tracks/{b['name']}").status_code == 200
+    assert admin.get("/api/playlist").json()["music"] == {"mode": "off"}                # last song gone -> silence, not an error
+    assert admin.delete(f"/api/music/tracks/{b['name']}").status_code == 404
+    assert not list(admin.app.state.uploads.iterdir())
+
+
+def test_music_radio_and_validation(admin):
+    assert admin.put("/api/music", json={"mode": "radio"}).status_code == 400
+    for bad in ("javascript:alert(1)", "file:///etc/passwd", "http://a b", "ftp://x"):
+        assert admin.put("/api/music", json={"mode": "radio", "radio_url": bad}).status_code == 400, bad
+    assert admin.put("/api/music", json={"mode": "disco"}).status_code == 400
+    r = admin.put("/api/music", json={"mode": "radio", "radio_url": "https://stream.example.org/live.mp3", "radio_name": "תחנה", "volume": 30})
+    assert r.status_code == 200
+    assert admin.get("/api/playlist").json()["music"] == {"mode": "radio", "volume": 30, "url": "https://stream.example.org/live.mp3"}
+    admin.cookies.clear()
+    assert admin.get("/api/music").status_code == 401 and admin.put("/api/music", json={"mode": "off"}).status_code == 401
+    assert admin.post("/api/music/tracks", files={"file": ("a.mp3", MP3, "audio/mpeg")}).status_code == 401
+
+
+def test_slide_expiry_and_copy(admin):
+    # FIXED_NOW is 2026-11-18
+    live = admin.post("/api/slides", json={"template": "promo", "data": {"title": "עד היום"}, "expires": "2026-11-18"}).json()
+    gone = admin.post("/api/slides", json={"template": "promo", "data": {"title": "אתמול"}, "expires": "2026-11-17"}).json()
+    assert live["active_now"] and not live["expired"] and gone["expired"] and not gone["active_now"]
+    assert [s["id"] for s in admin.get("/api/playlist").json()["slides"]] == [live["id"]]
+    assert admin.post("/api/slides", json={"template": "promo", "expires": "18/11/2026"}).status_code == 400
+    back = admin.put(f"/api/slides/{gone['id']}", json={"data": gone["data"], "expires": None}).json()
+    assert back["expires"] is None and back["active_now"]
+
+    copy = admin.post(f"/api/slides/{live['id']}/copy").json()
+    assert copy["id"] != live["id"] and copy["data"] == live["data"] and copy["expires"] == "2026-11-18"
+    assert [s["id"] for s in admin.get("/api/slides").json()][-1] == copy["id"]
+    assert admin.post("/api/slides/999/copy").status_code == 404
+
+
+def test_old_database_gains_expiry_column(tmp_path):
+    import sqlite3
+    db = sqlite3.connect(tmp_path / "signage.db")
+    db.execute("CREATE TABLE slides (id INTEGER PRIMARY KEY AUTOINCREMENT, template TEXT NOT NULL, data TEXT NOT NULL, "
+               "duration INTEGER NOT NULL DEFAULT 12, enabled INTEGER NOT NULL DEFAULT 1, schedule TEXT, position INTEGER NOT NULL DEFAULT 0)")
+    db.execute("INSERT INTO slides(template,data) VALUES('text','{\"title\":\"ישן\"}')")
+    db.commit(); db.close()
+    c = TestClient(create_app(tmp_path, now=lambda: FIXED_NOW))
+    c.post("/api/auth/setup", json={"pin": "1234"})
+    old = c.get("/api/slides").json()
+    assert old[0]["data"]["title"] == "ישן" and old[0]["expires"] is None and old[0]["active_now"]
+
+
+# ---------- out of the box: network, address on screen, first-run wizard ----------
+def test_screen_waits_for_network_then_shows_address(client):
+    client.app.state.lan_ip = lambda: None                       # cable not plugged in yet
+    p = client.get("/api/playlist").json()
+    assert p["network"] is False and p["admin_url"] == "" and p["setup_done"] is False
+    assert client.get("/api/qr.svg").status_code == 404
+    client.app.state.lan_ip = lambda: "192.168.1.57"             # router handed out an address
+    p = client.get("/api/playlist").json()
+    assert p["network"] is True and p["admin_url"] == "http://192.168.1.57:8080"
+    assert client.get("/api/qr.svg").status_code == 200
+
+
+def test_port_80_gives_a_bare_address(tmp_path, monkeypatch):
+    monkeypatch.setenv("SIGNAGE_PORT", "80")
+    c = TestClient(create_app(tmp_path))
+    c.app.state.lan_ip = lambda: "192.168.1.57"
+    assert c.get("/api/playlist").json()["admin_url"] == "http://192.168.1.57"
+
+
+def test_typing_the_address_on_a_phone_leads_to_admin(client):
+    r = client.get("/", follow_redirects=False)                  # not the device itself
+    assert r.status_code == 302 and r.headers["location"] == "/admin"
+    local = TestClient(client.app, client=("127.0.0.1", 5000))
+    assert local.get("/", follow_redirects=False).status_code == 200   # the kiosk browser gets the display
+
+
+@pytest.mark.parametrize("category,count", [("business", 4), ("lobby", 4), ("synagogue", 5), ("general", 2)])
+def test_first_run_wizard_builds_a_working_screen(client, category, count):
+    assert client.post("/api/setup", json={"place": "x", "city": "חיפה", "category": category}).status_code == 401
+    client.post("/api/auth/setup", json={"pin": "1234"})
+    state = client.get("/api/auth/state").json()
+    assert state["setup_done"] is False and "חיפה" in state["cities"]
+    assert client.post("/api/setup", json={"place": "בית הקפה", "city": "חיפה", "category": "nope"}).status_code == 400
+    assert client.post("/api/setup", json={"place": "בית הקפה", "city": "פריז", "category": category}).status_code == 400
+    r = client.post("/api/setup", json={"place": "בית הקפה", "city": "חיפה", "category": category})
+    assert r.json() == {"ok": True, "slides": count}
+    pl = client.get("/api/playlist").json()
+    assert pl["setup_done"] is True and len(pl["slides"]) == count
+    for s in pl["slides"]:
+        assert client.get(f"/render/{s['id']}").status_code == 200
+    first = client.get(f"/render/{pl['slides'][0]['id']}").text
+    assert "ברוכים הבאים" in first and "בית הקפה" in first
+    assert client.get("/api/settings").json()["city"] == "חיפה"
+    # running it again must not pile up a second set
+    assert client.post("/api/setup", json={"place": "בית הקפה", "city": "חיפה", "category": category}).json()["slides"] == count
+
+
+def test_existing_screens_skip_the_wizard(admin):
+    admin.post("/api/slides", json={"template": "text"})
+    assert admin.get("/api/auth/state").json()["setup_done"] is True
