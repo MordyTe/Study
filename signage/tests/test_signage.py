@@ -101,7 +101,7 @@ def test_hebrew_date():
 # ---------- templates ----------
 def test_every_template_renders_with_defaults(admin):
     lib = admin.app.state.lib
-    assert len(lib.templates) == 12
+    assert len(lib.templates) == 13
     for template_id in lib.templates:
         r = admin.post("/api/preview", json={"template": template_id, "data": {}})
         assert r.status_code == 200, template_id
@@ -399,3 +399,52 @@ def test_canva_export_failure_and_denied_consent(canva):
     assert c.post("/api/canva/import", json={}).status_code == 400
     assert c.post("/api/canva/disconnect").status_code == 200
     assert c.get("/api/canva/status").json()["connected"] is False
+
+
+# ---------- video, display ----------
+MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64
+WEBM = b"\x1a\x45\xdf\xa3" + b"\x00" * 64
+
+
+def test_video_upload_slide_and_delete(admin):
+    assert admin.post("/api/videos", files={"file": ("a.mp4", b"MZ not a video at all", "video/mp4")}).status_code == 400
+    assert admin.post("/api/videos", files={"file": ("a.mp4", png_bytes(), "video/mp4")}).status_code == 400
+    mp4 = admin.post("/api/videos", files={"file": ("clip.mov", MP4, "video/quicktime")}).json()["name"]
+    webm = admin.post("/api/videos", files={"file": ("clip", WEBM, "video/webm")}).json()["name"]
+    assert mp4.endswith(".mp4") and webm.endswith(".webm")
+    assert sorted(admin.get("/api/videos").json()) == sorted([mp4, webm])
+    assert admin.get("/api/images").json() == []                      # videos are not listed as images
+    assert (admin.app.state.uploads / mp4).read_bytes() == MP4
+    assert not list(admin.app.state.uploads.glob("*.part"))
+
+    slide = admin.post("/api/slides", json={"template": "video", "data": {"video": mp4, "sound": "on"}}).json()
+    html = admin.get(f"/render/{slide['id']}").text
+    assert f'src="/uploads/{mp4}"' in html and " muted" not in html.split("<video")[1].split(">")[0]
+    assert admin.get("/api/playlist").json()["slides"] == [{"id": slide["id"], "duration": 12, "wait_end": True}]
+    assert admin.post("/api/slides", json={"template": "video", "data": {"video": "../x.mp4"}}).status_code == 400
+    assert admin.post("/api/slides", json={"template": "image", "data": {"image": mp4}}).status_code == 400
+
+    assert admin.delete(f"/api/videos/{mp4}").status_code == 200
+    assert "עוד לא נבחר סרטון" in admin.get(f"/render/{slide['id']}").text
+    assert admin.delete(f"/api/videos/{mp4}").status_code == 404
+
+
+def test_video_needs_login_and_size_limit(client, admin, monkeypatch):
+    client.cookies.clear()
+    assert client.post("/api/videos", files={"file": ("a.mp4", MP4, "video/mp4")}).status_code == 401
+    client.post("/api/auth/login", json={"pin": "1234"})
+    import server.app as app_module
+    monkeypatch.setattr(app_module, "MAX_VIDEO", 1024)
+    big = MP4 + b"\x00" * 4096
+    assert client.post("/api/videos", files={"file": ("a.mp4", big, "video/mp4")}).status_code == 413
+    assert client.get("/api/videos").json() == [] and not list(client.app.state.uploads.iterdir())
+
+
+def test_display_report(admin):
+    assert admin.get("/api/settings").json()["display"] is None
+    assert admin.post("/api/display", json={"width": 3840, "height": 2160}).status_code == 200
+    d = admin.get("/api/settings").json()["display"]
+    assert (d["width"], d["height"], d["live"]) == (3840, 2160, True)
+    admin.post("/api/display", json={"width": 5, "height": 5})        # nonsense is ignored
+    assert admin.get("/api/settings").json()["display"]["width"] == 3840
+    assert admin.post("/api/display", json={"width": "x"}).status_code == 400

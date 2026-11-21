@@ -1,7 +1,7 @@
 """Slide templates: each is templates/<id>/template.json (fields) + template.html (Jinja).
 
 Adding a template = adding a folder; no Python changes needed.
-Field types: text, textarea, number, select, image, images, rows.
+Field types: text, textarea, number, select, image, images, video, rows.
 """
 from __future__ import annotations
 
@@ -67,6 +67,7 @@ BACKGROUNDS = {
 BG_PREFIX = "bg:"
 
 IMAGE_NAME = re.compile(r"^[0-9a-f]{16}\.(jpg|png)$")
+VIDEO_NAME = re.compile(r"^[0-9a-f]{16}\.(mp4|webm)$")
 MAX_ROWS = 40
 MAX_IMAGES = 30
 _LIMITS = {"text": 120, "textarea": 1500}
@@ -152,6 +153,12 @@ class Library:
                 return ""
             if not isinstance(raw, str) or not IMAGE_NAME.match(raw):
                 raise TemplateError(f"{label}: תמונה לא תקינה")
+            return raw
+        if kind == "video":
+            if not raw:
+                return ""
+            if not isinstance(raw, str) or not VIDEO_NAME.match(raw):
+                raise TemplateError(f"{label}: סרטון לא תקין")
             return raw
         if kind == "images":
             items = raw or []

@@ -143,7 +143,7 @@
           frame('/render/' + s.id),
           h('div', {},
             h('h3', {}, s.data.title || s.template_name, badge),
-            h('div', { class: 'meta', text: s.template_name + ' · ' + s.duration + ' שניות · ' + scheduleText(s.schedule) }),
+            h('div', { class: 'meta', text: s.template_name + ' · ' + (templateOf(s.template).wait_end ? 'עד סוף הסרטון' : s.duration + ' שניות') + ' · ' + scheduleText(s.schedule) }),
             h('div', { class: 'btns' },
               h('button', { class: 'small', text: 'עריכה', onclick: function () { editSlide(s); } }),
               h('button', { class: 'small', text: s.enabled ? 'כיבוי' : 'הפעלה', onclick: function () {
@@ -243,6 +243,7 @@
     var id = 'f_' + f.key;
     var wrap = h('div', {});
     if (f.type === 'rows') { wrap.appendChild(h('label', { text: f.label })); wrap.appendChild(rowsEditor(f, data)); return wrap; }
+    if (f.type === 'video') { wrap.appendChild(h('label', { text: f.label })); wrap.appendChild(videoPicker(f, data)); return wrap; }
     if (f.type === 'image' || f.type === 'images') { wrap.appendChild(h('label', { text: f.label })); wrap.appendChild(picker(f, data)); return wrap; }
     wrap.appendChild(h('label', { for: id, text: f.label }));
     var input;
@@ -280,6 +281,37 @@
       } }));
     }
     draw();
+    return box;
+  }
+
+  /* Video chooser: one video per slide; files are uploaded as they are (no conversion). */
+  function videoPicker(f, data) {
+    var box = h('div', {});
+    function draw(list) {
+      box.textContent = '';
+      if (!list.length) box.appendChild(h('p', { class: 'muted', text: 'עוד אין סרטונים. העלו סרטון מהטלפון.' }));
+      box.appendChild(h('div', { class: 'pics' }, list.map(function (name) {
+        var on = data[f.key] === name;
+        return h('button', { type: 'button', class: 'pic', 'aria-pressed': String(on), 'aria-label': on ? 'סרטון נבחר' : 'בחירת סרטון', onclick: function () { data[f.key] = on ? '' : name; draw(list); } },
+          h('video', { src: '/uploads/' + name + '#t=0.5', preload: 'metadata', muted: 'muted', playsinline: 'playsinline', tabindex: '-1' }));
+      })));
+      var input = h('input', { type: 'file', accept: 'video/mp4,video/webm', hidden: true });
+      var btn = h('button', { type: 'button', text: 'העלאת סרטון', onclick: function () { input.click(); } });
+      input.addEventListener('change', function () {
+        if (!input.files[0]) return;
+        var fd = new FormData(); fd.append('file', input.files[0]);
+        btn.disabled = true; btn.textContent = 'מעלה… זה יכול לקחת כמה דקות';
+        api('POST', '/api/videos', fd).then(function (r) { data[f.key] = r.name; toast('הסרטון עלה'); load(); })
+          .catch(function (err) { fail(err); btn.disabled = false; btn.textContent = 'העלאת סרטון'; });
+      });
+      var tools = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px' }, btn, input);
+      if (data[f.key]) tools.appendChild(h('button', { type: 'button', class: 'danger', text: 'מחיקת הסרטון הנבחר', onclick: function () {
+        if (confirm('למחוק את הסרטון מהמכשיר?')) api('DELETE', '/api/videos/' + data[f.key]).then(function () { data[f.key] = ''; toast('נמחק'); load(); }).catch(fail);
+      } }));
+      box.appendChild(tools);
+    }
+    function load() { api('GET', '/api/videos').then(draw).catch(fail); }
+    load();
     return box;
   }
 
@@ -349,8 +381,9 @@
       always.addEventListener('change', function () { schedBox.hidden = always.checked; });
       var duration = h('input', { type: 'number', id: 'dur', inputmode: 'numeric', min: '5', max: '600', value: draft.duration });
 
+      var waitEnd = !!templateOf(draft.template).wait_end;
       screen('כך זה ייראה', back, [steps(4), frame(null, html),
-        h('label', { for: 'dur', text: 'כמה שניות להציג לפני המעבר לשקופית הבאה' }), duration,
+        waitEnd ? h('p', { class: 'muted', text: 'הסרטון מתנגן עד סופו, ואז עוברים לשקופית הבאה.', style: 'margin-top:12px' }) : [h('label', { for: 'dur', text: 'כמה שניות להציג לפני המעבר לשקופית הבאה' }), duration],
         h('div', { class: 'check' }, always, h('label', { for: 'always', text: 'להציג תמיד', style: 'margin:0' })),
         schedBox
       ], [
@@ -462,6 +495,10 @@
           h('button', { class: 'primary', text: 'שמירה', onclick: function () {
             api('PUT', '/api/settings', { place: place.value, city: city.value }).then(function () { toast('נשמר'); }).catch(fail);
           } })),
+        h('div', { class: 'card' },
+          h('h2', { text: 'המסך המחובר', style: 'margin-top:0' }),
+          h('p', { text: s.display ? s.display.width + ' × ' + s.display.height + ' פיקסלים' + (s.display.live ? '' : ' (התצוגה לא פעילה כרגע)') : 'התצוגה עוד לא נפתחה על המסך.' }),
+          h('p', { class: 'muted', text: 'הרזולוציה מזוהה אוטומטית מהמסך דרך ה-HDMI, והשקופיות מתאימות את עצמן לכל גודל. אין מה להגדיר.' })),
         h('div', { class: 'card' },
           h('h2', { text: 'כתובת דף הניהול', style: 'margin-top:0' }),
           h('p', { class: 'ltr', text: s.admin_url }),

@@ -33,6 +33,7 @@ iframe.on{opacity:1}
   var frames=[document.getElementById('a'),document.getElementById('b')], front=0;
   var slides=[], version=null, index=-1, timer=null, shownAt=0;
   var setup=document.getElementById('setup');
+  var MAX_VIDEO=20*60*1000;       // safety net if a video never reports that it ended
   var REFRESH_SINGLE=10*60*1000;  // one slide only: reload so computed times stay current
 
   function show(i){
@@ -43,7 +44,7 @@ iframe.on{opacity:1}
     function swap(){
       if(done) return; done=true;
       back.classList.add('on'); frames[front].classList.remove('on'); front=1-front; shownAt=Date.now();
-      var wait=slides.length>1 ? slide.duration*1000 : REFRESH_SINGLE;
+      var wait=slide.wait_end ? MAX_VIDEO : (slides.length>1 ? slide.duration*1000 : REFRESH_SINGLE);
       timer=setTimeout(function(){ show(index+1); }, wait);
     }
     back.onload=swap;
@@ -67,6 +68,15 @@ iframe.on{opacity:1}
       }
     }).catch(function(){ /* server unreachable: keep showing what we have */ });
   }
+  // a video slide tells us when it finished; only the slide on screen may advance the show
+  window.addEventListener('message', function(e){
+    if(e.data==='slide-ended' && e.source===frames[front].contentWindow && slides[index] && slides[index].wait_end) show(index+1);
+  });
+  function report(){
+    fetch('/api/display',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({width:Math.round(innerWidth*devicePixelRatio),height:Math.round(innerHeight*devicePixelRatio)})}).catch(function(){});
+  }
+  report(); setInterval(report, 15000); window.addEventListener('resize', report);
   poll(); setInterval(poll, 5000);
 })();
 </script>

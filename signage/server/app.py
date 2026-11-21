@@ -21,12 +21,13 @@ from . import schedule as sched
 from . import zmanim
 from .canva import Canva, CanvaError
 from .store import Store
-from .templates_lib import BACKGROUNDS, BG_PREFIX, CATEGORIES, IMAGE_NAME, THEMES, Library, TemplateError
+from .templates_lib import BACKGROUNDS, BG_PREFIX, CATEGORIES, IMAGE_NAME, THEMES, VIDEO_NAME, Library, TemplateError
 
 STATIC = Path(__file__).resolve().parent / "static"
 COOKIE = "sg_session"
 SESSION_SECONDS = 30 * 24 * 3600
 MAX_UPLOAD = 25 * 1024 * 1024
+MAX_VIDEO = 300 * 1024 * 1024
 MAX_SIDE = 2560
 MAX_FAILS, LOCK_SECONDS = 5, 60
 
@@ -54,6 +55,7 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
     lib = Library()
     port = int(os.environ.get("SIGNAGE_PORT", "8080"))
     fails = {"count": 0, "locked_until": 0.0}
+    display: dict = {}
     # Canva only accepts redirect URLs registered in advance; a LAN address cannot be one.
     canva = Canva(store, os.environ.get("SIGNAGE_CANVA_REDIRECT") or f"http://127.0.0.1:{port}/api/canva/callback",
                   transport=canva_transport, sleep=(lambda s: None) if canva_transport else time.sleep)
@@ -147,7 +149,8 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
 
     @app.get("/api/settings", dependencies=[Depends(admin)])
     def get_settings():
-        return {**settings(), "cities": list(zmanim.CITIES), "admin_url": admin_url()}
+        shown = {**display, "live": time.time() - display["seen"] < 30} if display else None
+        return {**settings(), "cities": list(zmanim.CITIES), "admin_url": admin_url(), "display": shown}
 
     @app.put("/api/settings", dependencies=[Depends(admin)])
     def put_settings(body: dict = Body(...)):
@@ -178,7 +181,7 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         data = dict(data)
         for field in lib.get(template_id)["fields"]:  # drop images that were deleted since
             key = field["key"]
-            if field["type"] == "image" and data.get(key) and not (uploads / data[key]).is_file():
+            if field["type"] in ("image", "video") and data.get(key) and not (uploads / data[key]).is_file():
                 data[key] = ""
             if field["type"] == "images":
                 data[key] = [i for i in data.get(key, []) if (uploads / i).is_file()]
@@ -301,6 +304,44 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         store.bump()
         return {"ok": True}
 
+    # --- videos -----------------------------------------------------------
+    @app.get("/api/videos", dependencies=[Depends(admin)])
+    def list_videos():
+        files = sorted(uploads.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        return [p.name for p in files if VIDEO_NAME.match(p.name)]
+
+    @app.post("/api/videos", dependencies=[Depends(admin)])
+    async def upload_video(file: UploadFile = File(...)):
+        head = await file.read(16)
+        if head[4:8] == b"ftyp":
+            ext = ".mp4"
+        elif head[:4] == b"\x1a\x45\xdf\xa3":
+            ext = ".webm"
+        else:
+            raise HTTPException(400, "אפשר להעלות רק סרטוני MP4 או WebM")
+        name = secrets.token_hex(8) + ext
+        partial, size = uploads / (name + ".part"), len(head)
+        try:
+            with partial.open("wb") as out:   # streamed to disk: videos do not fit in memory on a Pi
+                out.write(head)
+                while chunk := await file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > MAX_VIDEO:
+                        raise HTTPException(413, "הסרטון גדול מדי (עד 300MB)")
+                    out.write(chunk)
+            partial.rename(uploads / name)
+        finally:
+            partial.unlink(missing_ok=True)
+        return {"name": name}
+
+    @app.delete("/api/videos/{name}", dependencies=[Depends(admin)])
+    def delete_video(name: str):
+        if not VIDEO_NAME.match(name) or not (uploads / name).is_file():
+            raise HTTPException(404, "אין סרטון כזה")
+        (uploads / name).unlink()
+        store.bump()
+        return {"ok": True}
+
     # --- Canva ------------------------------------------------------------
     def canva_call(fn, *args):
         try:
@@ -360,11 +401,22 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
     def playlist():
         moment = now()
         active = [
-            {"id": s["id"], "duration": s["duration"]}
+            {"id": s["id"], "duration": s["duration"], "wait_end": bool(lib.templates.get(s["template"], {}).get("wait_end"))}
             for s in store.slides()
             if s["enabled"] and sched.is_active(s["schedule"], moment) and s["template"] in lib.templates
         ]
         return {"version": store.version(), "slides": active, "admin_url": admin_url()}
+
+    @app.post("/api/display")
+    def report_display(body: dict = Body(...)):
+        """The display page reports the resolution the browser actually got from the screen."""
+        try:
+            w, h = int(body.get("width")), int(body.get("height"))
+        except (TypeError, ValueError):
+            raise HTTPException(400, "bad size") from None
+        if 100 <= w <= 20000 and 100 <= h <= 20000:
+            display.update(width=w, height=h, seen=time.time())
+        return {"ok": True}
 
     @app.get("/api/qr.svg")
     def qr():

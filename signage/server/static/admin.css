@@ -64,3 +64,4 @@ a.btn:focus-visible{outline:3px solid var(--brand);outline-offset:1px}
 .design{aspect-ratio:16/11;display:flex;flex-direction:column;background:var(--card)}
 .design img{flex:1;min-height:0;object-fit:contain;background:#0001}
 .design .cap{font-size:.8rem;padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.pic video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}

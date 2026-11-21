@@ -1,0 +1,7 @@
+{"name":"סרטון","description":"סרטון במסך מלא, מתנגן עד סופו","categories":["general","business","lobby","synagogue"],"background":false,"wait_end":true,"order":105,
+ "fields":[
+  {"key":"video","label":"סרטון","type":"video","default":""},
+  {"key":"fit","label":"התאמה למסך","type":"select","default":"contain","options":[{"value":"contain","label":"להציג את כל הסרטון"},{"value":"cover","label":"למלא את המסך (חותך קצוות)"}]},
+  {"key":"sound","label":"קול","type":"select","default":"off","options":[{"value":"off","label":"בלי קול"},{"value":"on","label":"עם קול"}]}
+ ],
+ "help":"קובצי MP4 (H.264) או WebM, עד 300MB. סרטון שצולם בטלפון בדרך כלל מתאים."}
