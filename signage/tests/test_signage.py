@@ -266,3 +266,136 @@ def test_photo_background_and_fallback_when_deleted(admin):
 @pytest.mark.parametrize("bad", ["bg:nope", "x.jpg", "url(http://evil)", "bg:dusk);}body{x", 5])
 def test_bad_background_rejected(admin, bad):
     assert admin.post("/api/preview", json={"template": "text", "data": {"background": bad}}).status_code == 400
+
+
+# ---------- Canva (against a fake Canva; the real service has not been exercised) ----------
+import base64
+import hashlib
+from urllib.parse import parse_qs, urlparse
+
+import httpx
+
+
+class FakeCanva:
+    def __init__(self):
+        self.access, self.refresh, self.challenge, self.calls, self.polls = "at1", "rt1", None, [], 0
+        self.fail_export = False
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        self.calls.append(f"{request.method} {path}")
+        if request.url.host == "export.canva.test":
+            return httpx.Response(200, content=png_bytes(size=(1920, 1080)))
+        if path == "/rest/v1/oauth/token":
+            form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
+            if request.headers.get("authorization") != "Basic " + base64.b64encode(b"cid:shh").decode():
+                return httpx.Response(401, json={"code": "invalid_client"})
+            if form["grant_type"] == "authorization_code":
+                digest = base64.urlsafe_b64encode(hashlib.sha256(form["code_verifier"].encode()).digest()).rstrip(b"=").decode()
+                if form["code"] != "good-code" or digest != self.challenge or "redirect_uri" not in form:
+                    return httpx.Response(400, json={"code": "invalid_grant"})
+            elif form.get("refresh_token") != self.refresh:
+                return httpx.Response(400, json={"code": "invalid_grant"})
+            n = int(self.access[2:]) + 1
+            self.access, self.refresh = f"at{n}", f"rt{n}"       # refresh tokens rotate
+            return httpx.Response(200, json={"access_token": self.access, "refresh_token": self.refresh,
+                                             "token_type": "Bearer", "expires_in": 14400})
+        if request.headers.get("authorization") != "Bearer " + self.access:
+            return httpx.Response(401, json={"code": "invalid_access_token"})
+        if path == "/rest/v1/designs":
+            if request.url.params.get("continuation") == "page2":
+                return httpx.Response(200, json={"items": [{"id": "D3", "title": "שלישי"}]})
+            return httpx.Response(200, json={"continuation": "page2", "items": [
+                {"id": "D1", "title": "תפריט חורף", "thumbnail": {"url": "https://thumb.canva.test/1.png"}}, {"id": "D2"}]})
+        if path == "/rest/v1/exports" and request.method == "POST":
+            return httpx.Response(200, json={"job": {"id": "J1", "status": "in_progress"}})
+        if path == "/rest/v1/exports/J1":
+            self.polls += 1
+            if self.polls < 2:
+                return httpx.Response(200, json={"job": {"id": "J1", "status": "in_progress"}})
+            if self.fail_export:
+                return httpx.Response(200, json={"job": {"id": "J1", "status": "failed", "error": {"code": "internal_failure"}}})
+            return httpx.Response(200, json={"job": {"id": "J1", "status": "success", "urls": [
+                "https://export.canva.test/p1.png", "https://export.canva.test/p2.png"]}})
+        return httpx.Response(404)
+
+
+@pytest.fixture
+def canva(tmp_path):
+    fake = FakeCanva()
+    client = TestClient(create_app(tmp_path, now=lambda: FIXED_NOW, canva_transport=httpx.MockTransport(fake)), follow_redirects=False)
+    client.post("/api/auth/setup", json={"pin": "1234"})
+    return client, fake
+
+
+def connect(client, fake):
+    assert client.put("/api/canva/config", json={"client_id": "cid", "client_secret": "shh"}).status_code == 200
+    r = client.get("/api/canva/login")
+    assert r.status_code == 302
+    q = parse_qs(urlparse(r.headers["location"]).query)
+    assert r.headers["location"].startswith("https://www.canva.com/api/oauth/authorize?")
+    assert q["code_challenge_method"] == ["s256"] and q["client_id"] == ["cid"]
+    assert q["redirect_uri"] == ["http://127.0.0.1:8080/api/canva/callback"]
+    assert q["scope"] == ["design:meta:read design:content:read"]
+    fake.challenge = q["code_challenge"][0]
+    return q["state"][0]
+
+
+def test_canva_needs_login_and_config(client, canva):
+    for url in ("/api/canva/status", "/api/canva/designs", "/api/canva/login"):
+        assert client.get(url).status_code == 401
+    c, _ = canva
+    assert c.get("/api/canva/status").json()["configured"] is False
+    assert c.get("/api/canva/login").status_code == 502
+    assert c.get("/api/canva/designs").status_code == 502
+    assert c.put("/api/canva/config", json={"client_id": "cid"}).status_code == 400
+
+
+def test_canva_connect_list_and_import(canva):
+    c, fake = canva
+    state = connect(c, fake)
+    assert c.get("/api/canva/callback?code=good-code&state=wrong").headers["location"] == "/admin#canva=failed"
+    assert c.get("/api/canva/status").json()["connected"] is False
+    state = connect(c, fake)                      # a failed attempt burns the state; start over
+    assert c.get(f"/api/canva/callback?code=good-code&state={state}").headers["location"] == "/admin#canva=ok"
+    assert c.get(f"/api/canva/callback?code=good-code&state={state}").headers["location"] == "/admin#canva=failed"  # no replay
+    st = c.get("/api/canva/status").json()
+    assert st["connected"] and "client_secret" not in st
+
+    first = c.get("/api/canva/designs").json()
+    assert first["items"][0] == {"id": "D1", "title": "תפריט חורף", "thumbnail": "https://thumb.canva.test/1.png"}
+    assert first["items"][1] == {"id": "D2", "title": "ללא שם", "thumbnail": ""} and first["continuation"] == "page2"
+    assert c.get("/api/canva/designs?continuation=page2").json() == {"items": [{"id": "D3", "title": "שלישי", "thumbnail": ""}], "continuation": ""}
+
+    names = c.post("/api/canva/import", json={"design_id": "D1"}).json()["names"]
+    assert len(names) == 2 and sorted(c.get("/api/images").json()) == sorted(names)
+    assert Image.open(c.app.state.uploads / names[0]).size == (1920, 1080)
+    slide = c.post("/api/slides", json={"template": "image", "data": {"image": names[0]}}).json()
+    assert f"/uploads/{names[0]}" in c.get(f"/render/{slide['id']}").text
+
+
+def test_canva_token_refresh_on_401(canva):
+    c, fake = canva
+    c.get(f"/api/canva/callback?code=good-code&state={connect(c, fake)}")
+    c.app.state.store.set("canva_access_token", "stale")     # our copy is stale; refresh token still valid
+    assert c.get("/api/canva/designs").status_code == 200
+    assert "POST /rest/v1/oauth/token" in fake.calls[-2:]
+    assert c.app.state.store.get("canva_refresh_token") == fake.refresh
+
+    fake.refresh = "rotated-away"                             # refresh token no longer valid -> disconnected
+    c.app.state.store.set("canva_access_token", "stale")
+    r = c.get("/api/canva/designs")
+    assert r.status_code == 502 and "מחדש" in r.json()["detail"]
+    assert c.get("/api/canva/status").json()["connected"] is False
+
+
+def test_canva_export_failure_and_denied_consent(canva):
+    c, fake = canva
+    assert c.get("/api/canva/callback?error=access_denied").headers["location"] == "/admin#canva=denied"
+    c.get(f"/api/canva/callback?code=good-code&state={connect(c, fake)}")
+    fake.fail_export = True
+    r = c.post("/api/canva/import", json={"design_id": "D1"})
+    assert r.status_code == 502 and c.get("/api/images").json() == []
+    assert c.post("/api/canva/import", json={}).status_code == 400
+    assert c.post("/api/canva/disconnect").status_code == 200
+    assert c.get("/api/canva/status").json()["connected"] is False

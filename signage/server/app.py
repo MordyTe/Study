@@ -13,12 +13,13 @@ from pathlib import Path
 
 import segno
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from . import schedule as sched
 from . import zmanim
+from .canva import Canva, CanvaError
 from .store import Store
 from .templates_lib import BACKGROUNDS, BG_PREFIX, CATEGORIES, IMAGE_NAME, THEMES, Library, TemplateError
 
@@ -45,7 +46,7 @@ def _hash_pin(pin: str, salt: str) -> str:
     return hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(salt), 200_000).hex()
 
 
-def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zmanim.TZ)) -> FastAPI:
+def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zmanim.TZ), canva_transport=None) -> FastAPI:
     data = Path(data_dir or os.environ.get("SIGNAGE_DATA") or Path(__file__).resolve().parent.parent / "data")
     uploads = data / "uploads"
     uploads.mkdir(parents=True, exist_ok=True)
@@ -53,6 +54,9 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
     lib = Library()
     port = int(os.environ.get("SIGNAGE_PORT", "8080"))
     fails = {"count": 0, "locked_until": 0.0}
+    # Canva only accepts redirect URLs registered in advance; a LAN address cannot be one.
+    canva = Canva(store, os.environ.get("SIGNAGE_CANVA_REDIRECT") or f"http://127.0.0.1:{port}/api/canva/callback",
+                  transport=canva_transport, sleep=(lambda s: None) if canva_transport else time.sleep)
 
     app = FastAPI(title="Signage", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store, app.state.lib, app.state.uploads = store, lib, uploads
@@ -270,6 +274,9 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         raw = await file.read(MAX_UPLOAD + 1)
         if len(raw) > MAX_UPLOAD:
             raise HTTPException(413, "התמונה גדולה מדי (עד 25MB)")
+        return {"name": save_image(raw)}
+
+    def save_image(raw: bytes) -> str:
         try:
             img = Image.open(io.BytesIO(raw))
             img.load()
@@ -284,7 +291,7 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         else:
             name = secrets.token_hex(8) + ".jpg"
             img.convert("RGB").save(uploads / name, "JPEG", quality=88)
-        return {"name": name}
+        return name
 
     @app.delete("/api/images/{name}", dependencies=[Depends(admin)])
     def delete_image(name: str):
@@ -293,6 +300,57 @@ def create_app(data_dir: str | Path | None = None, now=lambda: datetime.now(zman
         (uploads / name).unlink()
         store.bump()
         return {"ok": True}
+
+    # --- Canva ------------------------------------------------------------
+    def canva_call(fn, *args):
+        try:
+            return fn(*args)
+        except CanvaError as exc:
+            raise HTTPException(502, str(exc)) from None
+
+    @app.get("/api/canva/status", dependencies=[Depends(admin)])
+    def canva_status():
+        return {"configured": canva.configured(), "connected": canva.connected(),
+                "client_id": store.get("canva_client_id"), "redirect_uri": canva.redirect_uri}
+
+    @app.put("/api/canva/config", dependencies=[Depends(admin)])
+    def canva_config(body: dict = Body(...)):
+        client_id, secret = str(body.get("client_id") or "").strip(), str(body.get("client_secret") or "").strip()
+        if not client_id or not secret or len(client_id) > 200 or len(secret) > 400:
+            raise HTTPException(400, "צריך למלא גם מזהה וגם סוד")
+        canva.configure(client_id, secret)
+        return {"ok": True}
+
+    @app.get("/api/canva/login", dependencies=[Depends(admin)])
+    def canva_login():
+        return RedirectResponse(canva_call(canva.login_url), status_code=302)
+
+    @app.get("/api/canva/callback")
+    def canva_callback(code: str = "", state: str = "", error: str = ""):
+        # no session needed: the unguessable `state` proves this answers a login the admin started
+        if error or not code:
+            return RedirectResponse("/admin#canva=denied", status_code=302)
+        try:
+            canva.finish_login(code, state)
+        except CanvaError:
+            return RedirectResponse("/admin#canva=failed", status_code=302)
+        return RedirectResponse("/admin#canva=ok", status_code=302)
+
+    @app.post("/api/canva/disconnect", dependencies=[Depends(admin)])
+    def canva_disconnect():
+        canva.disconnect()
+        return {"ok": True}
+
+    @app.get("/api/canva/designs", dependencies=[Depends(admin)])
+    def canva_designs(continuation: str = "", query: str = ""):
+        return canva_call(canva.designs, continuation[:2000], query[:100])
+
+    @app.post("/api/canva/import", dependencies=[Depends(admin)])
+    def canva_import(body: dict = Body(...)):
+        design_id = str(body.get("design_id") or "")
+        if not design_id or len(design_id) > 100:
+            raise HTTPException(400, "עיצוב לא תקין")
+        return {"names": [save_image(page) for page in canva_call(canva.export_png, design_id)]}
 
     # --- display ------------------------------------------------------------
     def admin_url() -> str:

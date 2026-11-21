@@ -105,6 +105,12 @@
   function boot() {
     Promise.all([api('GET', '/api/templates'), api('GET', '/api/images')]).then(function (r) {
       lib = r[0]; images = r[1]; bar.hidden = false; showHome();
+      var m = /canva=(\w+)/.exec(location.hash);   // returning from Canva's consent page
+      if (m) {
+        history.replaceState(null, '', location.pathname);
+        if (m[1] === 'ok') { toast('חשבון Canva חובר'); showCanva(); }
+        else toast(m[1] === 'denied' ? 'החיבור ל-Canva בוטל' : 'החיבור ל-Canva נכשל. נסו שוב', true);
+      }
     }).catch(fail);
   }
 
@@ -376,8 +382,67 @@
         } }, h('img', { src: '/uploads/' + name, alt: '', loading: 'lazy' }));
       })));
       if (images.length) nodes.push(h('p', { class: 'muted', text: 'לחיצה על תמונה מוחקת אותה (אחרי אישור).', style: 'margin-top:12px' }));
-      screen('תמונות', showHome, nodes, [uploadButton('העלאת תמונות', showImages)]);
+      screen('תמונות', showHome, nodes, [h('button', { text: 'ייבוא מ-Canva', onclick: showCanva }), uploadButton('העלאת תמונות', showImages)]);
     }).catch(fail);
+  }
+
+  // ---------- Canva ----------
+  function showCanva() {
+    api('GET', '/api/canva/status').then(function (st) {
+      if (!st.connected) {
+        return screen('ייבוא מ-Canva', showImages, [h('div', { class: 'card empty' },
+          h('h2', { text: st.configured ? 'חשבון Canva עוד לא מחובר' : 'החיבור ל-Canva עוד לא הוגדר' }),
+          h('p', { class: 'muted', text: 'מגדירים ומחברים פעם אחת בהגדרות, ואז העיצובים שלכם מופיעים כאן.' }),
+          h('button', { class: 'primary', text: 'להגדרות', onclick: showSettings }))]);
+      }
+      var grid = h('div', { class: 'pics designs' });
+      var more = h('button', { text: 'עוד עיצובים', hidden: true });
+      var note = h('p', { class: 'muted', text: 'טוען…' });
+      var next = '';
+      function load() {
+        more.disabled = true;
+        api('GET', '/api/canva/designs' + (next ? '?continuation=' + encodeURIComponent(next) : '')).then(function (r) {
+          note.textContent = r.items.length || grid.children.length ? 'לחיצה על עיצוב מייבאת אותו לספריית התמונות. עיצוב בגודל 1920×1080 ימלא את המסך בדיוק.' : 'לא נמצאו עיצובים בחשבון.';
+          r.items.forEach(function (d) {
+            var b = h('button', { type: 'button', class: 'pic design', 'aria-label': 'ייבוא העיצוב ' + d.title, onclick: function () {
+              b.disabled = true; toast('מייבא את "' + d.title + '"…');
+              api('POST', '/api/canva/import', { design_id: d.id }).then(function (res) {
+                res.names.forEach(function (n) { images.unshift(n); });
+                toast(res.names.length > 1 ? res.names.length + ' עמודים יובאו לספריית התמונות' : 'יובא לספריית התמונות');
+              }).catch(fail).then(function () { b.disabled = false; });
+            } }, d.thumbnail ? h('img', { src: d.thumbnail, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null, h('span', { class: 'cap', text: d.title }));
+            grid.appendChild(b);
+          });
+          next = r.continuation; more.hidden = !next; more.disabled = false;
+        }).catch(function (err) { note.textContent = ''; fail(err); });
+      }
+      more.addEventListener('click', load);
+      screen('ייבוא מ-Canva', showImages, [note, grid, h('p', {}), more]);
+      load();
+    }).catch(fail);
+  }
+  function canvaCard() {
+    var card = h('div', { class: 'card' }, h('h2', { text: 'Canva', style: 'margin-top:0' }), h('p', { class: 'muted', text: 'טוען…' }));
+    api('GET', '/api/canva/status').then(function (st) {
+      var cid = h('input', { id: 'cid', class: 'ltr', type: 'text', autocomplete: 'off', value: st.client_id });
+      var sec = h('input', { id: 'csec', class: 'ltr', type: 'password', autocomplete: 'off', placeholder: st.configured ? 'נשמר. הקלידו רק כדי להחליף' : '' });
+      card.textContent = '';
+      append(card, [h('h2', { text: 'Canva', style: 'margin-top:0' }),
+        h('p', { class: 'muted', text: st.connected ? 'חשבון מחובר. מייבאים עיצובים ממסך "תמונות".' : 'חיבור חשבון Canva מאפשר לייבא עיצובים ישירות לספריית התמונות.' }),
+        h('label', { for: 'cid', text: 'Client ID' }), cid,
+        h('label', { for: 'csec', text: 'Client secret' }), sec,
+        h('p', { class: 'muted', style: 'margin-top:8px' }, 'כתובת החזרה שצריך לרשום ב-Canva: ', h('span', { class: 'ltr', text: st.redirect_uri })),
+        h('div', { class: 'btns', style: 'display:flex;gap:8px;flex-wrap:wrap' },
+          h('button', { text: 'שמירת פרטי החיבור', onclick: function () {
+            api('PUT', '/api/canva/config', { client_id: cid.value, client_secret: sec.value }).then(function () { toast('נשמר'); showSettings(); }).catch(fail);
+          } }),
+          st.configured && !st.connected ? h('a', { class: 'btn primary', href: '/api/canva/login', text: 'חיבור חשבון Canva' }) : null,
+          st.connected ? h('button', { class: 'danger', text: 'ניתוק החשבון', onclick: function () {
+            api('POST', '/api/canva/disconnect').then(function () { toast('נותק'); showSettings(); }).catch(fail);
+          } }) : null),
+        st.configured && !st.connected && location.hostname !== '127.0.0.1' ? h('p', { class: 'muted', style: 'margin-top:8px', text: 'בגרסה הזאת את החיבור עצמו עושים פעם אחת מדפדפן על המכשיר שמריץ את המסך (בכתובת 127.0.0.1), כי Canva לא מאפשרת חזרה לכתובת ברשת הביתית.' }) : null]);
+    }).catch(function () { card.lastChild.textContent = 'לא ניתן לטעון את מצב החיבור.'; });
+    return card;
   }
 
   // ---------- settings ----------
@@ -401,6 +466,7 @@
           h('h2', { text: 'כתובת דף הניהול', style: 'margin-top:0' }),
           h('p', { class: 'ltr', text: s.admin_url }),
           h('p', { class: 'muted', text: 'עובדת מכל טלפון או מחשב שמחובר לאותה רשת.' })),
+        canvaCard(),
         h('div', { class: 'card' },
           h('h2', { text: 'החלפת קוד כניסה', style: 'margin-top:0' }),
           h('label', { for: 'old', text: 'הקוד הנוכחי' }), oldPin,
