@@ -1,0 +1,13 @@
+{% extends "_base.html" %}
+{% block css %}.time{font-size:34vh;font-weight:800;line-height:1;letter-spacing:-.03em}
+.day{font-size:7vh;font-weight:700;color:var(--accent);margin-top:3vh}
+.heb{font-size:5.5vh;margin-top:1vh}.msg{font-size:4.5vh;margin-top:5vh;opacity:.8}{% endblock %}
+{% block body %}
+<div class="wrap center">
+  <div class="time num" data-clock="time"></div>
+  <div class="day">{{ day_name }}</div>
+  <div class="heb">{{ hebrew_date }} · <span id="greg" class="num"></span></div>
+  {% if d.message %}<div class="msg">{{ d.message }}</div>{% endif %}
+</div>
+{% endblock %}
+{% block script %}<script>(function(){var n=new Date();document.getElementById('greg').textContent=n.getDate()+'.'+(n.getMonth()+1)+'.'+n.getFullYear()})()</script>{% endblock %}

@@ -1,0 +1,5 @@
+{"name":"זמני שבת","description":"הדלקת נרות, צאת השבת ופרשת השבוע, מחושב לפי העיר","categories":["lobby","synagogue"],"order":70,
+ "fields":[
+  {"key":"title","label":"כותרת","type":"text","default":"שבת שלום","max":40},
+  {"key":"message","label":"שורת טקסט מתחת (לא חובה)","type":"text","default":"","max":100}
+ ]}

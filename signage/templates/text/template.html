@@ -1,0 +1,9 @@
+{% extends "_base.html" %}
+{% set len = d.body|length %}
+{% block css %}h1{font-size:11vh}.body{font-size:{{ 6 if len < 120 else (4.8 if len < 300 else 3.8) }}vh;max-width:82vw;text-wrap:pretty}{% endblock %}
+{% block body %}
+<div class="wrap {{ 'center' if d.align == 'center' else '' }}" style="justify-content:center">
+  <h1>{{ d.title }}</h1><div class="rule"></div>
+  {% if d.body %}<div class="body">{{ d.body|nl2br }}</div>{% endif %}
+</div>
+{% endblock %}

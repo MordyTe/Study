@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:{{ t.bg }};--fg:{{ t.fg }};--accent:{{ t.accent }};--card:{{ t.card }}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);
+  font-family:Heebo,Assistant,"Noto Sans Hebrew","Segoe UI",Arial,sans-serif;direction:rtl;line-height:1.25}
+.wrap{height:100vh;padding:6vh 5vw 7vh;display:flex;flex-direction:column}
+.center{align-items:center;justify-content:center;text-align:center}
+h1{font-size:9vh;margin:0 0 3.5vh;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+h2{font-size:5vh;margin:0 0 2vh;font-weight:600;color:var(--accent)}
+.accent{color:var(--accent)}
+.muted{opacity:.7}
+.card{background:var(--card);border-radius:2.2vh;padding:3vh 3vw}
+.grow{flex:1;min-height:0}
+.rule{height:.7vh;width:14vw;background:var(--accent);border-radius:1vh;margin:0 0 4vh}
+.center .rule{margin-inline:auto}
+.table{display:grid;column-gap:5vw;align-content:center}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:2vw;padding:1.1vh 0;
+  border-bottom:.2vh solid color-mix(in srgb,var(--fg) 18%,transparent)}
+.row .v{font-weight:700;color:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums}
+.row small{display:block;font-size:.62em;opacity:.7;font-weight:400}
+.place{position:absolute;bottom:2.2vh;left:5vw;font-size:2.6vh;opacity:.55}
+.num{font-variant-numeric:tabular-nums}
+/* times and ranges like "8:00 – 20:00" must not be reordered by the RTL context */
+.row .t{unicode-bidi:plaintext}
+{% block css %}{% endblock %}
+</style>
+</head>
+<body>
+{% block body %}{% endblock %}
+{% if place and not hide_place %}<div class="place">{{ place }}</div>{% endif %}
+<script>
+(function(){
+  function tick(){
+    var n=new Date(), p=function(x){return String(x).padStart(2,'0')};
+    document.querySelectorAll('[data-clock]').forEach(function(el){
+      el.textContent = el.dataset.clock==='seconds' ? p(n.getSeconds()) : n.getHours()+':'+p(n.getMinutes());
+    });
+  }
+  if(document.querySelector('[data-clock]')){ tick(); setInterval(tick,1000); }
+})();
+</script>
+{% block script %}{% endblock %}
+</body>
+</html>

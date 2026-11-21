@@ -1,0 +1,4 @@
+{"name":"שעון ותאריך","description":"שעה, יום ותאריך עברי ולועזי","categories":["lobby","synagogue","general"],"order":60,
+ "fields":[
+  {"key":"message","label":"שורת טקסט מתחת (לא חובה)","type":"text","default":"","max":100}
+ ]}

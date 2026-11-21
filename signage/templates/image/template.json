@@ -1,0 +1,6 @@
+{"name":"תמונה במסך מלא","description":"תמונה אחת, עם כיתוב אם רוצים","categories":["general","business"],"order":100,
+ "fields":[
+  {"key":"image","label":"תמונה","type":"image","default":""},
+  {"key":"caption","label":"כיתוב (לא חובה)","type":"text","default":"","max":100},
+  {"key":"fit","label":"התאמה למסך","type":"select","default":"cover","options":[{"value":"cover","label":"למלא את המסך (חותך קצוות)"},{"value":"contain","label":"להציג את כל התמונה"}]}
+ ]}

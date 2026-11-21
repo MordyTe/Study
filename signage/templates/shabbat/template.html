@@ -1,0 +1,17 @@
+{% extends "_base.html" %}
+{% block css %}.par{font-size:6vh;color:var(--accent);font-weight:700;margin-bottom:5vh}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:3vw;width:80vw}
+.card .l{font-size:4.6vh;opacity:.85}.card .v{font-size:17vh;font-weight:800;line-height:1.1}
+.sm{font-size:3.4vh;margin-top:4vh;opacity:.65}.msg{font-size:4.4vh;margin-top:3vh}{% endblock %}
+{% block body %}
+<div class="wrap center">
+  <h1>{{ d.title }}</h1>
+  {% if shabbat.parsha %}<div class="par">פרשת {{ shabbat.parsha }}</div>{% else %}<div class="rule"></div>{% endif %}
+  <div class="two">
+    <div class="card"><div class="l">הדלקת נרות</div><div class="v num">{{ shabbat.candles }}</div></div>
+    <div class="card"><div class="l">צאת השבת</div><div class="v num">{{ shabbat.havdalah }}</div></div>
+  </div>
+  {% if d.message %}<div class="msg">{{ d.message }}</div>{% endif %}
+  <div class="sm">הזמנים מחושבים עבור {{ city }}</div>
+</div>
+{% endblock %}

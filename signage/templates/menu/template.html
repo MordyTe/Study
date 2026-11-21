@@ -1,0 +1,21 @@
+{% extends "_base.html" %}
+{% set n = d['items']|length %}
+{% set cols = 2 if n > 7 else 1 %}
+{% set per = ((n + cols - 1) // cols) if n else 1 %}
+{# rows on one grid line share a height, so assume every line with a note is two lines tall #}
+{% set notes = [per, d['items']|selectattr('note')|list|length]|min %}
+{% set avail = 55 if d.footer else 62 %}
+{% set size = [7, (avail - 2.2 * per) / (1.25 * per + 0.78 * notes)]|min %}
+{% block css %}.table{grid-template-columns:repeat({{ cols }},1fr);font-size:{{ size|round(2) }}vh}
+.foot{font-size:3.4vh;margin-top:2vh}{% endblock %}
+{% block body %}
+<div class="wrap">
+  <h1>{{ d.title }}</h1><div class="rule"></div>
+  <div class="table grow">
+    {% for it in d['items'] %}
+    <div class="row"><span>{{ it.name }}{% if it.note %}<small>{{ it.note }}</small>{% endif %}</span><span class="v">{{ it.price }}</span></div>
+    {% endfor %}
+  </div>
+  {% if d.footer %}<div class="foot muted">{{ d.footer }}</div>{% endif %}
+</div>
+{% endblock %}

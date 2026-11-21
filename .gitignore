@@ -35,3 +35,7 @@ simple_transcriber/*.log
 simple_transcriber/glossary.txt
 
 # Makor: office/data.js is generated each workday but committed so the page works from the repo
+
+# Signage runtime data (database, uploaded images)
+signage/data/
+signage/.venv/

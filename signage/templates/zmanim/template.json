@@ -1,0 +1,4 @@
+{"name":"זמני היום","description":"הנץ, סוף זמן קריאת שמע, שקיעה ועוד, מחושב לפי העיר","categories":["synagogue"],"order":90,
+ "fields":[
+  {"key":"title","label":"כותרת","type":"text","default":"זמני היום","max":40}
+ ]}

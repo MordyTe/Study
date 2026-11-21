@@ -1,0 +1,7 @@
+{"name":"תפריט / מחירון","description":"רשימת פריטים עם מחירים","categories":["business"],"order":10,
+ "fields":[
+  {"key":"title","label":"כותרת","type":"text","default":"התפריט שלנו","max":40},
+  {"key":"items","label":"פריטים","type":"rows","columns":[{"key":"name","label":"שם"},{"key":"note","label":"תיאור (לא חובה)"},{"key":"price","label":"מחיר"}],
+   "default":[{"name":"אספרסו","note":"","price":"9 ₪"},{"name":"קפה הפוך","note":"גדול או קטן","price":"14 ₪"},{"name":"קרואסון חמאה","note":"","price":"16 ₪"},{"name":"סנדוויץ' בוקר","note":"חביתה, גבינה וירקות","price":"32 ₪"}]},
+  {"key":"footer","label":"שורה תחתונה (לא חובה)","type":"text","default":"","max":80}
+ ]}

@@ -1,0 +1,7 @@
+{"name":"זמני תפילות","description":"הגבאי מקליד את התפילות והשעות","categories":["synagogue"],"order":80,
+ "fields":[
+  {"key":"title","label":"כותרת","type":"text","default":"זמני תפילות","max":40},
+  {"key":"prayers","label":"תפילות","type":"rows","columns":[{"key":"name","label":"תפילה"},{"key":"time","label":"שעה"}],
+   "default":[{"name":"שחרית","time":"6:30"},{"name":"שחרית מניין שני","time":"8:00"},{"name":"מנחה","time":"16:30"},{"name":"ערבית","time":"17:15"}]},
+  {"key":"footer","label":"שורה תחתונה (שיעור, הודעה)","type":"text","default":"","max":100}
+ ]}

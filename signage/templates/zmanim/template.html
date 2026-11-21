@@ -1,0 +1,14 @@
+{% extends "_base.html" %}
+{% block css %}.top{display:flex;justify-content:space-between;align-items:baseline}
+.top .side{font-size:4vh;opacity:.85}
+.table{grid-template-columns:1fr 1fr;font-size:6.6vh}
+.sm{font-size:2.6vh;opacity:.6;margin-top:1.5vh;max-width:70vw}{% endblock %}
+{% block body %}
+<div class="wrap">
+  <div class="top"><h1>{{ d.title }}</h1><div class="side">{{ day_name }} · {{ hebrew_date }}</div></div>
+  <div class="table grow">
+    {% for z in zmanim %}<div class="row"><span>{{ z.name }}</span><span class="v">{{ z.time }}</span></div>{% endfor %}
+  </div>
+  <div class="sm">מחושב עבור {{ city }}, לפי שיטת הגר"א. הזמנים מקורבים, אין להסתמך עליהם לדקה.</div>
+</div>
+{% endblock %}

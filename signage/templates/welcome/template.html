@@ -1,0 +1,12 @@
+{% extends "_base.html" %}
+{% block css %}.logo{max-height:26vh;max-width:40vw;margin-bottom:5vh;border-radius:2vh}
+h1{font-size:15vh}.sub{font-size:5.5vh;opacity:.85;text-wrap:balance}
+.clk{position:absolute;top:4vh;left:5vw;font-size:6vh;font-weight:700}{% endblock %}
+{% block body %}
+{% if d.clock == 'yes' %}<div class="clk num" data-clock="time"></div>{% endif %}
+<div class="wrap center">
+  {% if d.image %}<img class="logo" src="/uploads/{{ d.image }}" alt="">{% endif %}
+  <h1>{{ d.title }}</h1><div class="rule"></div>
+  {% if d.subtitle %}<div class="sub">{{ d.subtitle }}</div>{% endif %}
+</div>
+{% endblock %}

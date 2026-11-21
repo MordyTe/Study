@@ -1,0 +1,7 @@
+{"name":"ברוכים הבאים","description":"כותרת גדולה, שורת משנה ולוגו","categories":["business","lobby","synagogue"],"order":40,
+ "fields":[
+  {"key":"title","label":"כותרת","type":"text","default":"ברוכים הבאים","max":50},
+  {"key":"subtitle","label":"שורת משנה","type":"text","default":"","max":100},
+  {"key":"image","label":"לוגו או תמונה (לא חובה)","type":"image","default":""},
+  {"key":"clock","label":"להציג שעון","type":"select","default":"yes","options":[{"value":"yes","label":"כן"},{"value":"no","label":"לא"}]}
+ ]}

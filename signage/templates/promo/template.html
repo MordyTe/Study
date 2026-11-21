@@ -1,0 +1,21 @@
+{% extends "_base.html" %}
+{% block css %}
+.split{display:grid;grid-template-columns:{{ '1fr 1fr' if d.image else '1fr' }};height:100vh}
+.txt{display:flex;flex-direction:column;justify-content:center;padding:6vh 5vw;{{ '' if d.image else 'align-items:center;text-align:center' }}}
+.kick{font-size:4.6vh;font-weight:700;color:var(--accent);letter-spacing:.04em;margin-bottom:2vh}
+.big{font-size:{{ 11 if d.image else 14 }}vh;font-weight:800;line-height:1.05;text-wrap:balance}
+.price{font-size:{{ 15 if d.image else 19 }}vh;font-weight:800;color:var(--accent);margin-top:3vh;line-height:1}
+.note{font-size:4vh;margin-top:3vh;opacity:.8}
+.pic{background:center/cover no-repeat}
+{% endblock %}
+{% block body %}
+<div class="split">
+  <div class="txt">
+    {% if d.kicker %}<div class="kick">{{ d.kicker }}</div>{% endif %}
+    <div class="big">{{ d.title }}</div>
+    {% if d.price %}<div class="price">{{ d.price }}</div>{% endif %}
+    {% if d.note %}<div class="note">{{ d.note }}</div>{% endif %}
+  </div>
+  {% if d.image %}<div class="pic" style="background-image:url('/uploads/{{ d.image }}')"></div>{% endif %}
+</div>
+{% endblock %}

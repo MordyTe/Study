@@ -1,0 +1,6 @@
+{"name":"לוח הודעות","description":"עד 4 הודעות עם כותרת ותוכן","categories":["lobby","synagogue","business"],"order":50,
+ "fields":[
+  {"key":"title","label":"כותרת הלוח","type":"text","default":"הודעות","max":40},
+  {"key":"notices","label":"הודעות","type":"rows","columns":[{"key":"head","label":"כותרת"},{"key":"body","label":"תוכן"}],
+   "default":[{"head":"ניקיון חדר מדרגות","body":"ביום שלישי בבוקר. נא לפנות חפצים מהמעברים."},{"head":"אסיפת דיירים","body":"יום חמישי בשעה 20:00 בלובי."}]}
+ ]}

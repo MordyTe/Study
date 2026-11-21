@@ -1,0 +1,7 @@
+{"name":"שעות פתיחה","description":"ימים ושעות","categories":["business"],"order":30,
+ "fields":[
+  {"key":"title","label":"כותרת","type":"text","default":"שעות פתיחה","max":40},
+  {"key":"hours","label":"שעות","type":"rows","columns":[{"key":"name","label":"ימים"},{"key":"time","label":"שעות"}],
+   "default":[{"name":"ראשון עד חמישי","time":"8:00 – 20:00"},{"name":"שישי וערבי חג","time":"8:00 – 14:00"},{"name":"שבת","time":"סגור"}]},
+  {"key":"footer","label":"שורה תחתונה (טלפון, כתובת)","type":"text","default":"","max":80}
+ ]}

@@ -1,0 +1,16 @@
+{% extends "_base.html" %}
+{% set items = d.notices[:4] %}
+{% set n = items|length or 1 %}
+{% block css %}.top{display:flex;justify-content:space-between;align-items:baseline}
+.top .clk{font-size:6vh;font-weight:700}
+.grid{display:grid;gap:2.5vh 2vw;grid-template-columns:repeat({{ 2 if n > 2 else 1 }},1fr);grid-auto-rows:1fr}
+.card h2{font-size:{{ 5.2 if n > 2 else 6 }}vh}.card p{margin:0;font-size:{{ 3.8 if n > 2 else 4.6 }}vh;opacity:.9}
+.card{border-inline-start:1vh solid var(--accent);overflow:hidden}{% endblock %}
+{% block body %}
+<div class="wrap">
+  <div class="top"><h1>{{ d.title }}</h1><div class="clk num" data-clock="time"></div></div>
+  <div class="grid grow">
+    {% for it in items %}<div class="card"><h2>{{ it.head }}</h2><p>{{ it.body }}</p></div>{% endfor %}
+  </div>
+</div>
+{% endblock %}

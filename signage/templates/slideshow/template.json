@@ -1,0 +1,7 @@
+{"name":"מצגת תמונות","description":"כמה תמונות שמתחלפות","categories":["general","business","lobby","synagogue"],"order":110,
+ "fields":[
+  {"key":"images","label":"תמונות","type":"images","default":[]},
+  {"key":"seconds","label":"שניות לכל תמונה","type":"number","default":6,"min":2,"max":60},
+  {"key":"caption","label":"כיתוב קבוע (לא חובה)","type":"text","default":"","max":100}
+ ],
+ "help":"כדי שכל התמונות יוצגו, קבעו משך הצגה של השקופית לפחות מספר התמונות כפול השניות לכל תמונה."}

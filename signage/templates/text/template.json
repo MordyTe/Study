@@ -1,0 +1,6 @@
+{"name":"טקסט חופשי","description":"כותרת ופסקה, לכל הודעה","categories":["general","business","lobby","synagogue"],"order":120,
+ "fields":[
+  {"key":"title","label":"כותרת","type":"text","default":"כותרת","max":60},
+  {"key":"body","label":"טקסט","type":"textarea","default":"","max":600},
+  {"key":"align","label":"יישור","type":"select","default":"center","options":[{"value":"center","label":"למרכז"},{"value":"start","label":"לימין"}]}
+ ]}

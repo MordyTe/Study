@@ -1,0 +1,11 @@
+{% extends "_base.html" %}
+{% set hide_place = true %}
+{% block css %}.pic{position:absolute;inset:0;background:center/{{ d.fit }} no-repeat}
+.cap{position:absolute;bottom:0;right:0;left:0;padding:8vh 5vw 4vh;font-size:5.5vh;font-weight:700;color:#fff;
+  background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.empty{font-size:5vh;opacity:.6}{% endblock %}
+{% block body %}
+{% if d.image %}<div class="pic" style="background-image:url('/uploads/{{ d.image }}')"></div>
+{% else %}<div class="wrap center"><div class="empty">עוד לא נבחרה תמונה</div></div>{% endif %}
+{% if d.caption %}<div class="cap">{{ d.caption }}</div>{% endif %}
+{% endblock %}

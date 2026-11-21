@@ -1,0 +1,18 @@
+{% extends "_base.html" %}
+{% set n = d.prayers|length %}
+{% set cols = 2 if n > 6 else 1 %}
+{% set per = ((n + cols - 1) // cols) if n else 1 %}
+{% block css %}.top{display:flex;justify-content:space-between;align-items:baseline}
+.top .side{text-align:left;font-size:3.6vh;opacity:.8}.top .clk{font-size:7vh;font-weight:800;opacity:1}
+.table{grid-template-columns:repeat({{ cols }},1fr);font-size:{{ [8.5, (60 / per - 2.2) / 1.25]|min|round(2) }}vh}
+.foot{font-size:3.8vh;margin-top:2vh}{% endblock %}
+{% block body %}
+<div class="wrap">
+  <div class="top"><h1>{{ d.title }}</h1>
+    <div class="side"><div class="clk num" data-clock="time"></div>{{ day_name }} · {{ hebrew_date }}</div></div>
+  <div class="table grow">
+    {% for it in d.prayers %}<div class="row"><span>{{ it.name }}</span><span class="v t">{{ it.time }}</span></div>{% endfor %}
+  </div>
+  {% if d.footer %}<div class="foot accent">{{ d.footer }}</div>{% endif %}
+</div>
+{% endblock %}

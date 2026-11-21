@@ -1,0 +1,8 @@
+{"name":"מבצע","description":"הודעה גדולה אחת עם מחיר ותמונה","categories":["business"],"order":20,
+ "fields":[
+  {"key":"kicker","label":"שורה עליונה קטנה","type":"text","default":"מבצע היום","max":40},
+  {"key":"title","label":"הכותרת","type":"text","default":"קפה ומאפה","max":50},
+  {"key":"price","label":"מחיר","type":"text","default":"19 ₪","max":20},
+  {"key":"note","label":"שורת פירוט (לא חובה)","type":"text","default":"עד 11:00 בבוקר","max":80},
+  {"key":"image","label":"תמונה (לא חובה)","type":"image","default":""}
+ ]}

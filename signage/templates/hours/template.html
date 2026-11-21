@@ -1,0 +1,13 @@
+{% extends "_base.html" %}
+{% set n = d.hours|length or 1 %}
+{% block css %}.table{font-size:{{ [9, (60 / n - 2.2) / 1.25]|min|round(2) }}vh;width:74vw;margin:0 auto}
+.foot{font-size:4vh;margin-top:3vh;text-align:center}{% endblock %}
+{% block body %}
+<div class="wrap">
+  <h1 style="text-align:center">{{ d.title }}</h1><div class="rule" style="margin-inline:auto"></div>
+  <div class="table grow">
+    {% for it in d.hours %}<div class="row"><span>{{ it.name }}</span><span class="v t">{{ it.time }}</span></div>{% endfor %}
+  </div>
+  {% if d.footer %}<div class="foot muted">{{ d.footer }}</div>{% endif %}
+</div>
+{% endblock %}

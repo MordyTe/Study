@@ -1,0 +1,16 @@
+{% extends "_base.html" %}
+{% set hide_place = true %}
+{% block css %}.pic{position:absolute;inset:0;background:center/cover no-repeat;opacity:0;transition:opacity 1s}
+.pic.on{opacity:1}
+.cap{position:absolute;bottom:0;right:0;left:0;padding:8vh 5vw 4vh;font-size:5.5vh;font-weight:700;color:#fff;
+  background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.empty{font-size:5vh;opacity:.6}{% endblock %}
+{% block body %}
+{% for img in d.images %}<div class="pic{{ ' on' if loop.first }}" style="background-image:url('/uploads/{{ img }}')"></div>{% endfor %}
+{% if not d.images %}<div class="wrap center"><div class="empty">עוד לא נבחרו תמונות</div></div>{% endif %}
+{% if d.caption %}<div class="cap">{{ d.caption }}</div>{% endif %}
+{% endblock %}
+{% block script %}<script>(function(){
+  var pics=document.querySelectorAll('.pic'), i=0; if(pics.length<2) return;
+  setInterval(function(){pics[i].classList.remove('on'); i=(i+1)%pics.length; pics[i].classList.add('on')}, {{ d.seconds * 1000 }});
+})()</script>{% endblock %}
