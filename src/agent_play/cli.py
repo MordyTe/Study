@@ -32,6 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--effort", default=os.environ.get("AGENT_PLAY_EFFORT", "medium"), choices=["low", "medium", "high", "xhigh", "max"])
     parser.add_argument("--monitor", type=int, default=1)
     parser.add_argument("--region", help="x,y,w,h region of the monitor to capture")
+    parser.add_argument("--window", help="Capture the game by part of its window title (needs pygetwindow)")
     parser.add_argument("--image", help="Use a PNG file as the screen instead of capturing (tests, replays)")
     parser.add_argument("--no-redact", action="store_true", help="Keep text values in the trace")
     parser.add_argument("--sim", action="store_true", help="Drive the built-in simulator instead of the screen; its state persists per session")
@@ -70,10 +71,12 @@ def build_parser() -> argparse.ArgumentParser:
     wt.add_argument("--gone", action="store_true")
     wt.add_argument("--stable", action="store_true")
     wt.add_argument("--timeout", type=int, default=5000)
-    run = sub.add_parser("run", help="Let the agent carry out a task on the screen")
+    run = sub.add_parser("run", help="Let the agent carry out a task in a game window you define")
     run.add_argument("task")
     run.add_argument("--max-steps", type=int, default=40)
     run.add_argument("--skill", action="append", default=[], help="Extra skill, e.g. genres/puzzle")
+    run.add_argument("--adapt", action="store_true", help="Pick the genre skill automatically from the first look")
+    run.add_argument("--live", action="store_true", help="Show the live cockpit: observe/think/act/verify beside the game")
     run.add_argument("--instructions", default="")
     sk = sub.add_parser("skills")
     sk_sub = sk.add_subparsers(dest="skills_command", required=True)
@@ -104,6 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
     play.add_argument("--max-steps", type=int, default=30)
     play.add_argument("--vision", action="store_true", help="Also use the vision model for perception")
     play.add_argument("--scripted", action="store_true", help="Use the built-in scripted player instead of a model")
+    play.add_argument("--live", action="store_true", help="Show the live cockpit beside the game")
     return parser
 
 
@@ -144,7 +148,11 @@ def build_session(args: argparse.Namespace) -> Session:
             source: Any = StaticFrameSource(image.convert("RGB").copy())
     else:
         region = None
-        if args.region:
+        if getattr(args, "window", None):
+            from agent_play.perception.capture import window_region
+
+            region = window_region(args.window)
+        elif args.region:
             x, y, w, h = (float(v) for v in args.region.split(","))
             region = Rect(x, y, w, h)
         source = ScreenCapture(monitor=args.monitor, region=region)
@@ -255,9 +263,34 @@ def cmd_run(args: argparse.Namespace, session: Session) -> dict[str, Any]:
     from agent_play.agent.loop import AgentConfig, GameAgent
     from agent_play.agent.model import AnthropicModelClient
 
+    skills = ["core", *args.skill]
+    adapted = None
+    if getattr(args, "adapt", False):
+        from agent_play.agent.adapt import pick_genre
+
+        snapshot = session.observe()
+        genre, reason = pick_genre(snapshot)
+        adapted = {"genre": genre, "reason": reason}
+        _stderr(f"[adapt] {reason} -> {genre or 'core only'}")
+        if genre and genre not in skills:
+            skills.append(genre)
+    narrator = _make_narrator(args, target=(args.window or args.region or f"monitor {args.monitor}"))
     model = AnthropicModelClient(model=args.model, effort=args.effort)
-    agent = GameAgent(session, model, AgentConfig(max_steps=args.max_steps), skills=["core", *args.skill], extra_instructions=args.instructions, log=_stderr)
-    return agent.run(args.task).to_dict()
+    agent = GameAgent(session, model, AgentConfig(max_steps=args.max_steps), skills=skills, extra_instructions=args.instructions, log=_stderr, narrator=narrator)
+    result = agent.run(args.task).to_dict()
+    if adapted:
+        result["adapted"] = adapted
+    return result
+
+
+def _make_narrator(args: argparse.Namespace, target: str):
+    if not getattr(args, "live", False):
+        return None
+    from agent_play.narrate import LiveNarrator
+
+    narrator = LiveNarrator(stream=sys.stderr)
+    narrator.banner(getattr(args, "task", "play"), target)
+    return narrator
 
 
 def cmd_sim(args: argparse.Namespace) -> dict[str, Any]:
@@ -312,7 +345,8 @@ def cmd_sim(args: argparse.Namespace) -> dict[str, Any]:
         from agent_play.agent.model import AnthropicModelClient
 
         model = AnthropicModelClient(model=args.model, effort=args.effort)
-    agent = GameAgent(session, model, AgentConfig(max_steps=args.max_steps, include_image=not args.scripted), skills=["core", "genres/puzzle"], log=_stderr)
+    narrator = _make_narrator(args, target="agent-play simulator")
+    agent = GameAgent(session, model, AgentConfig(max_steps=args.max_steps, include_image=not args.scripted), skills=["core", "genres/puzzle"], log=(None if getattr(args, "live", False) else _stderr), narrator=narrator)
     result = agent.run(args.task).to_dict()
     result["game"] = game.status()
     game.save(_sim_state_path(args))

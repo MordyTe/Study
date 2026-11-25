@@ -107,6 +107,34 @@ class CallableFrameSource:
         return Frame(self.render())
 
 
+def window_region(title: str) -> "Rect":
+    """Resolve a window's on-screen rectangle by (partial) title, for --window capture.
+
+    Uses pygetwindow when present (cross-platform on the user's desktop). Imported lazily so the
+    package still works headless. Raises a clear error the CLI turns into one JSON envelope.
+    """
+    try:
+        import pygetwindow as gw
+    except Exception as exc:
+        raise AgentPlayError(
+            ErrorCode.PLATFORM_NOT_SUPPORTED,
+            "Targeting a window by title needs the optional dependency pygetwindow",
+            "pip install 'agent-play[window]', or pass --region x,y,w,h instead",
+            {"cause": str(exc)},
+        ) from exc
+    matches = [w for w in gw.getAllWindows() if title.lower() in (w.title or "").lower() and w.width > 0 and w.height > 0]
+    if not matches:
+        titles = [w.title for w in gw.getAllWindows() if w.title][:12]
+        raise AgentPlayError(
+            ErrorCode.WINDOW_NOT_FOUND,
+            f"No window title contains {title!r}",
+            "Pass part of the game window's title, or use --region. Open windows are in details.",
+            {"open_windows": titles},
+        )
+    win = max(matches, key=lambda w: w.width * w.height)
+    return Rect(float(win.left), float(win.top), float(win.width), float(win.height))
+
+
 class ScreenCapture:
     """Captures a monitor or a region with mss. Imported lazily so the package works without a display."""
 

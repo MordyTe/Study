@@ -83,6 +83,7 @@ class GameAgent:
         extra_instructions: str = "",
         log: Any | None = None,
         knowledge: KnowledgeStore | None = None,
+        narrator: Any | None = None,
     ) -> None:
         self.session = session
         self.model = model
@@ -90,6 +91,7 @@ class GameAgent:
         self.skills = skills or list(DEFAULT_SKILLS)
         self.extra_instructions = extra_instructions
         self.log = log or (lambda _line: None)
+        self.narrator = narrator
         self.knowledge = knowledge or KnowledgeStore(session.root)
         self.usage: dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0}
         self._assessment: Assessment | None = None
@@ -118,6 +120,8 @@ class GameAgent:
                 return self._finish("blocked_policy", self._assessment.reason, memory, None)
         messages: list[dict[str, Any]] = []
         snapshot = self.session.observe()
+        if self.narrator:
+            self.narrator.observe(snapshot)
         messages.append({"role": "user", "content": self._observation_blocks(snapshot, memory, first=True)})
         text_only_turns = 0
         last_snapshot = snapshot
@@ -132,6 +136,8 @@ class GameAgent:
                 self.usage[key] = self.usage.get(key, 0) + int(value)
             trace.write("model.turn", {"step": step, "stop_reason": turn.stop_reason, "tool_calls": [c.name for c in turn.tool_calls], "usage": turn.usage})
             self.log(f"step {step}: {turn.text[:160]!r} tools={[(c.name, c.input) for c in turn.tool_calls]}")
+            if self.narrator:
+                self.narrator.think(step, turn.text, turn.tool_calls)
             if turn.stop_reason == "refusal":
                 return self._finish("refused", f"The model declined to continue (category: {turn.refusal_category})", memory, last_snapshot)
             messages.append({"role": "assistant", "content": turn.raw_content})
@@ -151,6 +157,8 @@ class GameAgent:
             for call in turn.tool_calls[: self.config.max_tool_calls_per_turn]:
                 outcome, is_error, snapshot_from_call = self._dispatch(call, memory)
                 self.log(f"  {call.name} -> {'ERROR ' if is_error else ''}{outcome[:200]}")
+                if self.narrator:
+                    self.narrator.act(call.name, outcome, is_error)
                 results.append({"type": "tool_result", "tool_use_id": call.id, "content": outcome, "is_error": is_error})
                 if snapshot_from_call is not None:
                     observed_in_turn = snapshot_from_call
@@ -176,6 +184,8 @@ class GameAgent:
             if acted or observed_in_turn is None:
                 fresh = self.session.observe(fast_only=self.config.observe_after_actions == "fast")
                 last_snapshot = fresh
+                if self.narrator:
+                    self.narrator.observe(fresh)
                 results.extend(self._observation_blocks(fresh, memory))
             else:
                 results.append({"type": "text", "text": memory.render()})
@@ -257,6 +267,8 @@ class GameAgent:
             ]
 
     def _finish(self, status: str, summary: str, memory: WorkingMemory, snapshot: Snapshot | None, question: str | None = None) -> RunResult:
+        if self.narrator:
+            self.narrator.done(status, summary)
         self.session.trace.write("run.end", {"status": status, "steps": memory.steps, "actions": memory.actions})
         if self.session.dir is not None:
             memory.save(self.session.dir / "memory.json")

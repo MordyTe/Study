@@ -17,6 +17,10 @@ agent-play status                # what this machine can do
 agent-play sim play "reach the star"   # watch the agent play the built-in simulator
 agent-play anticheat "play Valorant"   # classify a game's anti-cheat risk
 agent-play knowledge list              # durable notes the agent kept across runs
+agent-play sim play --scripted --live  # watch the live cockpit (observe/think/act/verify) offline
+# play a real game window you define, adapting the genre skill automatically:
+agent-play --headed --window "Stardew" run "water the crops" --adapt --live
+agent-play --headed --region 0,0,1280,720 run "<task>" --live
 ```
 
 ## Invariants
@@ -33,6 +37,8 @@ agent-play knowledge list              # durable notes the agent kept across run
 | Input injection is behind `InputBackend`; tests use `DryRunBackend` or the simulator | `actions/backend.py` |
 | The simulator and the real pipeline share the same code path | `sim/`, `tests/test_agent_loop.py`, `tests/test_cli.py` |
 | A run assesses the task against the anti-cheat registry and warns before acting; no evasion is ever built | `knowledge/anticheat.py`, `agent/loop.py`, `tests/test_anticheat.py` |
+| The live cockpit narrates the loop (observe/think/act/verify) without changing what the agent does | `narrate.py`, `tests/test_narrate_adapt.py` |
+| The agent targets a window/region the user defines and adapts the genre skill from the first look | `perception/capture.py` (`window_region`), `agent/adapt.py` |
 
 ## Safety and honesty rules
 
